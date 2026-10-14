@@ -1,16 +1,48 @@
-export const METRIC_IDS = ["sleep", "mood", "productivity"] as const;
+export const METRIC_IDS = ["sleep", "mood", "productivity", "energy"] as const;
 export type MetricId = (typeof METRIC_IDS)[number];
 export type ExperimentStatus = "active" | "completed";
-export type Period = "A" | "B";
+export type HabitStatus = "done" | "not_done";
+export type MetricValues = Partial<Record<MetricId, number>>;
 
 export interface DailyEntry {
   id: string;
+  observedDate: string;
+  recordedAt: string | null;
+  updatedAt: string | null;
+  habitStatus: HabitStatus | null;
+  values: MetricValues;
+  note: string;
+  origin: "check_in" | "legacy_ab";
+}
+export interface Experiment {
+  id: string;
+  mode: "daily_habit";
+  title: string;
+  question: string;
+  habit: string;
+  durationDays: number;
+  metrics: MetricId[];
+  startDate: string;
+  entries: DailyEntry[];
+  source: "user" | "sample";
+  legacy?: LegacyExperiment;
+}
+export type NewExperiment = Pick<
+  Experiment,
+  "title" | "question" | "habit" | "durationDays" | "metrics"
+>;
+export interface DailyEntryDraft {
+  habitStatus: HabitStatus;
+  values: MetricValues;
+  note?: string;
+}
+export interface LegacyDailyEntry {
+  id: string;
   date: string;
-  values: Partial<Record<MetricId, number>>;
+  values: MetricValues;
   note: string;
 }
-
-export interface Experiment {
+export interface LegacyExperiment {
   id: string;
   title: string;
   hypothesis: string;
@@ -20,9 +52,5 @@ export interface Experiment {
   durationB: number;
   metrics: MetricId[];
   startDate: string;
-  entries: DailyEntry[];
+  entries: LegacyDailyEntry[];
 }
-
-export type NewExperiment = Omit<Experiment, "id" | "startDate" | "entries">;
-
-export type DailyEntryDraft = Pick<DailyEntry, "values" | "note">;

@@ -1,10 +1,10 @@
 "use client";
-
 import Link from "next/link";
+import { t } from "@/i18n";
 import { formatCount, formatDate } from "@/lib/format";
-import { endDate, getProgress, periodForDate } from "@/features/experiments/model/analytics";
-import { METRICS } from "@/features/experiments/model/metrics";
-import { useExperiments } from "@/features/experiments/context/experiments-provider";
+import { endDate, getProgress } from "../model/analytics";
+import { METRICS } from "../model/metrics";
+import { useExperiments } from "../context/experiments-provider";
 import { DailyEntryButton } from "./daily-entry";
 import { ExperimentProgress, StatusBadge } from "./experiment-card";
 import { Icon } from "@/components/icon";
@@ -21,12 +21,10 @@ export function ExperimentDetails({ id }: { id: string }) {
         <span className="icon-tile">
           <Icon name="flask" />
         </span>
-        <h1>Experiment not found</h1>
-        <p>
-          Check the link. Experiments created in this demo session reset when you reload the page.
-        </p>
+        <h1>{t.experiments.missing}</h1>
+        <p>{t.experiments.missingText}</p>
         <Link href="/experiments" className="button button-primary">
-          Back to experiments
+          {t.common.back}
         </Link>
       </Card>
     );
@@ -34,13 +32,16 @@ export function ExperimentDetails({ id }: { id: string }) {
   return (
     <>
       <Link href="/experiments" className="back-link">
-        ← Back to experiments
+        {t.common.back}
       </Link>
       <div className="detail-heading">
         <div>
           <div className="detail-eyebrow">
-            <span className="eyebrow">PERSONAL EXPERIMENT</span>
+            <span className="eyebrow">{t.experiments.daily}</span>
             <StatusBadge experiment={experiment} />
+            {experiment.source === "sample" && (
+              <span className="neutral-badge">{t.common.sample}</span>
+            )}
           </div>
           <h1>{experiment.title}</h1>
           <p className="detail-date">
@@ -56,52 +57,39 @@ export function ExperimentDetails({ id }: { id: string }) {
           <Icon name="sparkles" />
         </span>
         <div>
-          <span className="eyebrow">YOUR HYPOTHESIS</span>
-          <p>{experiment.hypothesis}</p>
+          <span className="eyebrow">{t.experiments.question}</span>
+          <p>{experiment.question}</p>
         </div>
       </Card>
       <div className="detail-conditions">
-        {(["A", "B"] as const).map((period) => (
-          <Card
-            key={period}
-            className={cn(
-              "detail-condition",
-              !progress.completed && progress.period === period && "detail-condition-current",
-            )}
-          >
-            <div className="section-heading">
-              <div className="condition-label">
-                <span className="period-letter">{period}</span>
-                <h2>{period === "A" ? "Usual routine" : "New conditions"}</h2>
-              </div>
-              <span className="neutral-badge">
-                {formatCount(period === "A" ? experiment.durationA : experiment.durationB, "day")}
-              </span>
-            </div>
-            <p>{period === "A" ? experiment.conditionA : experiment.conditionB}</p>
-            <span className="condition-status">
-              {progress.completed
-                ? "Period finished"
-                : progress.period === period
-                  ? `Current · day ${progress.periodDay} of ${progress.periodDuration}`
-                  : period === "A"
-                    ? "Period finished"
-                    : "Up next"}
+        <Card className="detail-condition detail-condition-current">
+          <div className="condition-label">
+            <span className="period-letter">
+              <Icon name="leaf" />
             </span>
-          </Card>
-        ))}
+            <h2>{t.experiments.habit}</h2>
+          </div>
+          <p>{experiment.habit}</p>
+        </Card>
+        <Card className="detail-condition">
+          <div className="condition-label">
+            <span className="period-letter">
+              <Icon name="chart" />
+            </span>
+            <h2>{t.experiments.method}</h2>
+          </div>
+          <p>{t.experiments.methodText}</p>
+        </Card>
       </div>
       <Card className="detail-progress-card">
         <div>
           <h2>
             {progress.completed
-              ? "Both periods finished"
-              : `Day ${progress.day} of ${progress.total}`}
+              ? t.experiments.completed
+              : t.common.dayOf(progress.day, progress.total)}
           </h2>
           <p className="muted">
-            {progress.completed
-              ? "Compare the observations you have collected."
-              : `You are in period ${progress.period}. Check in at your usual time.`}
+            {progress.completed ? t.experiments.completedText : t.experiments.progressText}
           </p>
         </div>
         <ExperimentProgress experiment={experiment} />
@@ -109,68 +97,100 @@ export function ExperimentDetails({ id }: { id: string }) {
       <Card className="detail-chart-card">
         <div className="section-heading">
           <div>
-            <h2>Your observations over time</h2>
-            <p className="muted">Your daily scores. Missing days are left empty.</p>
+            <h2>{t.experiments.trend}</h2>
+            <p className="muted">{t.experiments.trendText}</p>
           </div>
-          <span className="neutral-badge">Demo data</span>
+          <span className="neutral-badge">
+            {experiment.source === "sample" ? t.common.sample : t.common.local}
+          </span>
         </div>
+        {experiment.source === "sample" && (
+          <p className="field-hint">{t.experiments.sampleNotice}</p>
+        )}
         <MetricChart experiment={experiment} />
       </Card>
       <ResultsComparison experiment={experiment} />
+      {experiment.legacy && (
+        <Card className="legacy-card">
+          <h2>{t.experiments.legacy}</h2>
+          <p className="muted">{t.experiments.legacyText}</p>
+          <details className="calculation-details">
+            <summary>{t.experiments.original}</summary>
+            <p>
+              <strong>{t.experiments.usual}:</strong> {experiment.legacy.conditionA}
+            </p>
+            <p>
+              <strong>{t.experiments.changed}:</strong> {experiment.legacy.conditionB}
+            </p>
+          </details>
+        </Card>
+      )}
       <Card className="entries-card">
         <div className="section-heading">
           <div>
-            <h2>Daily check-ins</h2>
-            <p className="muted">Context matters just as much as the numbers.</p>
+            <h2>{t.experiments.entries}</h2>
+            <p className="muted">{t.experiments.context}</p>
           </div>
-          <span className="neutral-badge">
-            {formatCount(experiment.entries.length, "entry", "entries")}
-          </span>
+          <span className="neutral-badge">{formatCount(experiment.entries.length, "entry")}</span>
         </div>
         {experiment.entries.length === 0 ? (
           <div className="entries-empty">
             <Icon name="calendar" />
-            <p>Your first check-in will appear here. Start with today.</p>
+            <p>{t.experiments.noEntries}</p>
           </div>
         ) : (
           <div className="table-scroll">
             <table className="entries-table">
-              <caption className="sr-only">Daily scores and notes, newest entries first</caption>
+              <caption className="sr-only">{t.experiments.entriesCaption}</caption>
               <thead>
                 <tr>
-                  <th scope="col">Date</th>
-                  <th scope="col">Period</th>
+                  <th scope="col">{t.common.date}</th>
+                  <th scope="col">{t.experiments.status}</th>
                   {experiment.metrics.map((metric) => (
                     <th key={metric} scope="col">
                       {METRICS[metric].label}
                     </th>
                   ))}
-                  <th scope="col">Note</th>
+                  <th scope="col">{t.common.note}</th>
+                  <th scope="col">{t.experiments.actions}</th>
                 </tr>
               </thead>
               <tbody>
                 {[...experiment.entries].reverse().map((entry) => (
                   <tr key={entry.id}>
                     <th scope="row">
-                      <time dateTime={entry.date}>{formatDate(entry.date)}</time>
+                      <time dateTime={entry.observedDate}>{formatDate(entry.observedDate)}</time>
                     </th>
                     <td>
                       <span
                         className={cn(
-                          "table-period",
-                          periodForDate(experiment, entry.date) === "B" && "table-period-b",
+                          "habit-table-status",
+                          entry.habitStatus === "done" && "habit-table-done",
                         )}
                       >
-                        {periodForDate(experiment, entry.date)}
+                        {entry.habitStatus === "done"
+                          ? t.common.done
+                          : entry.habitStatus === "not_done"
+                            ? t.common.notDone
+                            : t.common.notRecorded}
                       </span>
                     </td>
                     {experiment.metrics.map((metric) => (
                       <td key={metric}>
-                        {entry.values[metric] ?? "—"}
-                        <span className="score-denominator"> / 10</span>
+                        {entry.values[metric] === undefined ? (
+                          "—"
+                        ) : (
+                          <>
+                            {entry.values[metric]}
+                            <span className="score-denominator"> / 10</span>
+                          </>
+                        )}
                       </td>
                     ))}
                     <td className="entry-note-cell">{entry.note || "—"}</td>
+                    <td>
+                      <DailyEntryButton experiment={experiment} date={entry.observedDate} row />
+                    </td>
                   </tr>
                 ))}
               </tbody>

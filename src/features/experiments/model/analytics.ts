@@ -1,49 +1,71 @@
-import type { Experiment, MetricId, Period } from "./types";
-
-export function dayOffset(start: string, date: string) {
-  return Math.round(
-    (Date.parse(`${date}T12:00:00Z`) - Date.parse(`${start}T12:00:00Z`)) / 86_400_000,
-  );
+import { addDays, dayOffset } from "@/lib/dates";
+import type { DailyEntry, Experiment, MetricId } from "./types";
+export { dayOffset } from "@/lib/dates";
+export const MIN_OBSERVATIONS = 5;
+export const SIMILARITY_THRESHOLD = 0.5;
+export function endDate(experiment: Experiment) {
+  return addDays(experiment.startDate, experiment.durationDays - 1);
 }
-
 export function getProgress(experiment: Experiment, referenceDate: string) {
-  const total = experiment.durationA + experiment.durationB;
+  const total = experiment.durationDays;
   const elapsed = dayOffset(experiment.startDate, referenceDate);
-  const completed = elapsed >= total;
-  const day = Math.min(total, Math.max(1, elapsed + 1));
-  const period: Period = day <= experiment.durationA ? "A" : "B";
-  const periodDay = period === "A" ? day : day - experiment.durationA;
-  const periodDuration = period === "A" ? experiment.durationA : experiment.durationB;
   const recorded = experiment.entries.length;
   return {
     total,
-    day,
-    period,
-    periodDay,
-    periodDuration,
+    day: Math.min(total, Math.max(1, elapsed + 1)),
     recorded,
-    completed,
-    percent: Math.round((recorded / total) * 100),
+    completed: elapsed >= total,
+    percent: total > 0 ? Math.min(100, Math.round((recorded / total) * 100)) : 0,
   };
 }
-
-export function periodForDate(experiment: Experiment, date: string): Period {
-  return dayOffset(experiment.startDate, date) < experiment.durationA ? "A" : "B";
+export function groupObservations(entries: readonly DailyEntry[]) {
+  return {
+    done: entries.filter((entry) => entry.habitStatus === "done"),
+    notDone: entries.filter((entry) => entry.habitStatus === "not_done"),
+    unclassified: entries.filter((entry) => entry.habitStatus === null),
+  };
 }
-
-export function metricSummary(experiment: Experiment, metric: MetricId, period: Period) {
-  const values = experiment.entries
-    .filter((entry) => periodForDate(experiment, entry.date) === period)
+export function summarizeMetric(entries: readonly DailyEntry[], metric: MetricId) {
+  const values = entries
     .map((entry) => entry.values[metric])
-    .filter((value): value is number => typeof value === "number");
+    .filter(
+      (value): value is number =>
+        typeof value === "number" && Number.isFinite(value) && value >= 1 && value <= 10,
+    );
   return {
     count: values.length,
     average: values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null,
   };
 }
+export function compareMetric(entries: readonly DailyEntry[], metric: MetricId) {
+  const groups = groupObservations(entries);
+  const done = summarizeMetric(groups.done, metric),
+    notDone = summarizeMetric(groups.notDone, metric);
+  const difference =
+    done.average !== null && notDone.average !== null ? done.average - notDone.average : null;
+  const enough = done.count >= MIN_OBSERVATIONS && notDone.count >= MIN_OBSERVATIONS;
+  const conclusion: "insufficient" | "higher" | "lower" | "similar" =
+    !enough || difference === null
+      ? "insufficient"
+      : Math.abs(difference) <= SIMILARITY_THRESHOLD
+        ? "similar"
+        : difference > 0
+          ? "higher"
+          : "lower";
+  return { done, notDone, difference, enough, conclusion };
+}
 
-export function endDate(experiment: Experiment) {
-  const date = new Date(`${experiment.startDate}T12:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + experiment.durationA + experiment.durationB - 1);
-  return date.toISOString().slice(0, 10);
+export function comparisonText(
+  result: ReturnType<typeof compareMetric>,
+  metricLabel: string,
+  copy: {
+    insufficient: string;
+    higher: (metric: string) => string;
+    lower: (metric: string) => string;
+    similar: (metric: string) => string;
+  },
+): string {
+  return result.conclusion === "insufficient"
+    ? copy.insufficient
+    : copy[result.conclusion](metricLabel);
 }

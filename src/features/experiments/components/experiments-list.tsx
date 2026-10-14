@@ -1,5 +1,7 @@
 "use client";
 
+import { t } from "@/i18n";
+
 import Link from "next/link";
 import { useState } from "react";
 import { getProgress } from "@/features/experiments/model/analytics";
@@ -17,9 +19,13 @@ export function ExperimentsList() {
     (experiment) => !getProgress(experiment, referenceDate).completed,
   ).length;
   const filters = [
-    { id: "all" as const, label: "All", count: experiments.length },
-    { id: "active" as const, label: "In progress", count: activeCount },
-    { id: "completed" as const, label: "Completed", count: experiments.length - activeCount },
+    { id: "all" as const, label: t.common.all, count: experiments.length },
+    { id: "active" as const, label: t.common.active, count: activeCount },
+    {
+      id: "completed" as const,
+      label: t.common.completed,
+      count: experiments.length - activeCount,
+    },
   ];
   const visible = experiments.filter(
     (experiment) =>
@@ -29,18 +35,18 @@ export function ExperimentsList() {
   return (
     <>
       <PageHeading
-        eyebrow="FROM QUESTION TO OBSERVATION"
-        title="My experiments"
-        description="Small changes that help you understand yourself."
+        eyebrow={t.experiments.eyebrow}
+        title={t.experiments.title}
+        description={t.experiments.description}
         action={
           <Link href="/experiments/new" className="button button-primary">
             <Icon name="plus" />
-            New experiment
+            {t.common.newExperiment}
           </Link>
         }
       />
       <div className="list-toolbar">
-        <div className="filter-tabs" role="group" aria-label="Filter by status">
+        <div className="filter-tabs" role="group" aria-label={t.experiments.filter}>
           {filters.map((item) => (
             <button
               key={item.id}
@@ -53,7 +59,11 @@ export function ExperimentsList() {
             </button>
           ))}
         </div>
-        <span className="muted">Demonstration data</span>
+        <span className="muted">
+          {experiments.some((experiment) => experiment.source === "sample")
+            ? t.experiments.source
+            : t.form.local}
+        </span>
       </div>
       {visible.length ? (
         <div className="experiments-grid">
@@ -64,18 +74,16 @@ export function ExperimentsList() {
       ) : (
         <Card className="empty-state">
           <Icon name="flask" />
-          <h2>No experiments here yet</h2>
-          <p>Try another filter or start a new experiment.</p>
+          <h2>{t.experiments.empty}</h2>
+          <p>{t.experiments.emptyText}</p>
           <Link href="/experiments/new" className="button button-primary">
-            New experiment
+            {t.common.newExperiment}
           </Link>
         </Card>
       )}
       <div className="list-bottom-note">
         <Icon name="info" />
-        <p>
-          One experiment, one question. Start with a change that fits easily into your daily life.
-        </p>
+        <p>{t.experiments.advice}</p>
       </div>
     </>
   );

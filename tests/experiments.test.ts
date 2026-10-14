@@ -1,177 +1,364 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { MOCK_EXPERIMENTS } from "../src/features/experiments/data/mock-experiments";
 import {
   buildDailyEntry,
   buildExperiment,
   experimentsReducer,
 } from "../src/features/experiments/model/actions";
 import {
-  dayOffset,
-  endDate,
+  compareMetric,
+  comparisonText,
   getProgress,
-  metricSummary,
-  periodForDate,
+  groupObservations,
+  summarizeMetric,
+  endDate,
 } from "../src/features/experiments/model/analytics";
 import {
-  dateSchema,
   getDailyEntrySchema,
   newExperimentSchema,
 } from "../src/features/experiments/model/schemas";
-import type { NewExperiment } from "../src/features/experiments/model/types";
-import { DEMO_DATE } from "../src/lib/config";
+import type {
+  DailyEntry,
+  MetricValues,
+  NewExperiment,
+} from "../src/features/experiments/model/types";
+import { AppError } from "../src/lib/errors";
+import { addDays, dayOffset, localDate } from "../src/lib/dates";
 import { formatCount, formatDate, formatNumber } from "../src/lib/format";
+import { LEGACY_EXPERIMENTS } from "../src/features/experiments/data/legacy-experiments";
+import { adaptLegacyExperiment, decodeWorkspace } from "../src/features/experiments/data/migration";
+import { createSampleExperiments } from "../src/features/experiments/data/mock-experiments";
+import { t } from "../src/i18n";
 
+const TODAY = "2026-10-14";
 const draft: NewExperiment = {
-  title: "  A calmer morning  ",
-  hypothesis: "A short walk may be associated with a better mood.",
-  conditionA: "Keep my usual morning routine.",
-  conditionB: "Take a 20-minute walk before work.",
-  durationA: 14,
-  durationB: 14,
-  metrics: ["mood"],
+  title: "  Morning walks  ",
+  question: "Do I feel better on days when I walk?",
+  habit: "Take a 20-minute walk",
+  durationDays: 28,
+  metrics: ["mood", "energy"],
 };
-const experiment = MOCK_EXPERIMENTS[0];
+const experiment = buildExperiment(draft, "experiment", TODAY);
+function entry(
+  index: number,
+  habitStatus: DailyEntry["habitStatus"],
+  values: MetricValues = { mood: 6 },
+): DailyEntry {
+  return {
+    id: `entry-${index}`,
+    observedDate: addDays(TODAY, -index),
+    recordedAt: null,
+    updatedAt: null,
+    habitStatus,
+    values,
+    note: "",
+    origin: habitStatus === null ? "legacy_ab" : "check_in",
+  };
+}
+function coded(code: string) {
+  return (error: unknown) => error instanceof AppError && error.code === code;
+}
 
-test("creation trims text and starts with no observations", () => {
-  const result = buildExperiment(draft, "new-experiment", DEMO_DATE);
-  assert.equal(result.title, "A calmer morning");
-  assert.equal(result.startDate, DEMO_DATE);
-  assert.deepEqual(result.entries, []);
-  assert.equal(draft.title, "  A calmer morning  ");
+test("two different experiments receive separate IDs and no previous fields or entries", () => {
+  const first = buildExperiment(draft, "first", TODAY),
+    second = buildExperiment(
+      {
+        ...draft,
+        title: "Less coffee",
+        question: "Do I sleep better without late coffee?",
+        habit: "Avoid coffee after 2 pm",
+        metrics: ["sleep"],
+      },
+      "second",
+      TODAY,
+    );
+  const state = experimentsReducer(
+    experimentsReducer([], { type: "experimentCreated", experiment: first }),
+    { type: "experimentCreated", experiment: second },
+  );
+  assert.equal(state.length, 2);
+  assert.equal(first.title, "Morning walks");
+  assert.equal(second.title, "Less coffee");
+  assert.deepEqual(second.metrics, ["sleep"]);
+  assert.deepEqual(first.entries, []);
+  assert.deepEqual(second.entries, []);
+  assert.equal(draft.title, "  Morning walks  ");
 });
-
-test("schema rejects empty text, invalid durations, and invalid metric selections", () => {
-  for (const title of ["", "   ", "a".repeat(121)])
-    assert.equal(newExperimentSchema.safeParse({ ...draft, title }).success, false);
-  for (const durationA of [0, -1, 1.5, 91, NaN, Infinity])
-    assert.equal(newExperimentSchema.safeParse({ ...draft, durationA }).success, false);
+test("creation rejects blank text, invalid durations, and missing or duplicate metrics", () => {
+  for (const field of ["title", "question", "habit"])
+    assert.equal(newExperimentSchema.safeParse({ ...draft, [field]: "  " }).success, false);
+  for (const durationDays of [0, -1, 1.5, 366, NaN, Infinity])
+    assert.equal(newExperimentSchema.safeParse({ ...draft, durationDays }).success, false);
   for (const metrics of [[], ["mood", "mood"], ["unknown"]])
     assert.equal(newExperimentSchema.safeParse({ ...draft, metrics }).success, false);
-  assert.equal(
-    newExperimentSchema.safeParse({ ...draft, durationA: 1, durationB: 90 }).success,
-    true,
+  assert.equal(newExperimentSchema.safeParse({ ...draft, durationDays: 365 }).success, true);
+});
+test("check-ins require an explicit habit choice and do not invent scores or notes", () => {
+  const schema = getDailyEntrySchema(["mood", "energy"]);
+  assert.equal(schema.safeParse({ values: {} }).success, false);
+  assert.equal(schema.safeParse({ habitStatus: null, values: {} }).success, false);
+  const result = buildDailyEntry(
+    experiment,
+    { habitStatus: "not_done", values: {} },
+    "entry",
+    TODAY,
+    TODAY,
   );
+  assert.equal(result.habitStatus, "not_done");
+  assert.deepEqual(result.values, {});
+  assert.equal(result.note, "");
 });
-
-test("calendar periods change at the A/B boundary and finish after the final day", () => {
-  assert.equal(getProgress(experiment, experiment.startDate).day, 1);
-  assert.equal(periodForDate(experiment, "2026-10-07"), "A");
-  assert.equal(periodForDate(experiment, "2026-10-08"), "B");
-  assert.equal(getProgress(experiment, "2026-10-07").period, "A");
-  assert.equal(getProgress(experiment, "2026-10-08").periodDay, 1);
-  assert.equal(getProgress(experiment, "2026-10-21").completed, false);
-  assert.equal(getProgress(experiment, "2026-10-22").completed, true);
-  assert.equal(endDate(experiment), "2026-10-21");
-});
-
-test("recorded progress is independent of calendar progress and the supplied clock", () => {
-  const result = getProgress(experiment, DEMO_DATE);
-  assert.equal(result.day, 20);
-  assert.equal(result.periodDay, 6);
-  assert.equal(result.recorded, 19);
-  assert.equal(result.percent, 68);
-  const fresh = buildExperiment(draft, "fresh", DEMO_DATE);
-  assert.equal(getProgress(fresh, DEMO_DATE).percent, 0);
-  assert.equal(getProgress(experiment, "2026-10-14").day, 21);
-});
-
-test("calendar day arithmetic is unaffected by daylight saving changes", () => {
-  assert.equal(dayOffset("2026-10-24", "2026-10-26"), 2);
-  assert.equal(dayOffset("2026-03-28", "2026-03-30"), 2);
-  assert.equal(dateSchema.safeParse("2026-02-30").success, false);
-});
-
-test("comparison counts only available values and keeps missing periods empty", () => {
-  assert.equal(metricSummary(experiment, "sleep", "A").count, 14);
-  assert.equal(metricSummary(experiment, "sleep", "B").count, 5);
-  assert.equal(metricSummary(MOCK_EXPERIMENTS[1], "sleep", "B").average, null);
-  const partial = {
-    ...experiment,
-    entries: [
-      { id: "one", date: experiment.startDate, values: { mood: 6 }, note: "" },
-      { id: "two", date: "2026-09-25", values: { sleep: 8 }, note: "" },
-    ],
-  };
-  assert.deepEqual(metricSummary(partial, "sleep", "A"), { count: 1, average: 8 });
-});
-
-test("check-ins require all selected metrics and valid integer scores", () => {
+test("optional scores reject invalid values and metrics not selected for the experiment", () => {
   const schema = getDailyEntrySchema(["mood"]);
   for (const values of [
-    {},
     { mood: 0 },
     { mood: 11 },
     { mood: 4.5 },
     { mood: NaN },
-    { mood: 5, sleep: 6 },
+    { mood: Infinity },
+    { energy: 5 },
   ])
-    assert.equal(schema.safeParse({ values, note: "" }).success, false);
-  assert.equal(schema.safeParse({ values: { mood: 6 }, note: "a".repeat(501) }).success, false);
-  assert.deepEqual(schema.parse({ values: { mood: 6 }, note: "  A quiet day.  " }), {
-    values: { mood: 6 },
-    note: "A quiet day.",
-  });
-});
-
-test("check-ins cannot be recorded outside the scheduled periods", () => {
-  const fresh = buildExperiment(draft, "fresh", DEMO_DATE);
-  for (const date of ["2026-10-12", "2026-11-10"])
-    assert.throws(
-      () => buildDailyEntry(fresh, { values: { mood: 6 }, note: "" }, "entry", date),
-      /scheduled periods/,
-    );
-});
-
-test("editing replaces the same date, preserves the entry ID, and never mutates fixtures", () => {
-  const initial = structuredClone(MOCK_EXPERIMENTS);
-  const values = { sleep: 5, mood: 6, productivity: 7 };
-  const entry = buildDailyEntry(
-    initial[0],
-    { values, note: " First note " },
-    "entry-id",
-    DEMO_DATE,
+    assert.equal(schema.safeParse({ habitStatus: "done", values }).success, false);
+  assert.equal(
+    schema.safeParse({ habitStatus: "done", values: {}, note: "a".repeat(501) }).success,
+    false,
   );
-  const saved = experimentsReducer(initial, {
+  assert.deepEqual(
+    schema.parse({ habitStatus: "done", values: { mood: 7 }, note: "  Quiet day  " }).note,
+    "Quiet day",
+  );
+});
+test("future check-ins and dates outside the observation window are rejected", () => {
+  assert.throws(
+    () =>
+      buildDailyEntry(
+        experiment,
+        { habitStatus: "done", values: {} },
+        "id",
+        addDays(TODAY, 1),
+        TODAY,
+      ),
+    coded("futureEntry"),
+  );
+  assert.throws(
+    () =>
+      buildDailyEntry(
+        experiment,
+        { habitStatus: "done", values: {} },
+        "id",
+        addDays(TODAY, -1),
+        TODAY,
+      ),
+    coded("outsideWindow"),
+  );
+  assert.throws(
+    () =>
+      buildDailyEntry(
+        experiment,
+        { habitStatus: "done", values: {} },
+        "id",
+        addDays(TODAY, 28),
+        addDays(TODAY, 30),
+      ),
+    coded("outsideWindow"),
+  );
+});
+test("editing replaces one date and preserves the ID without mutating earlier state", () => {
+  const first = buildDailyEntry(
+    experiment,
+    { habitStatus: "done", values: { mood: 8 }, note: "First" },
+    "first",
+    TODAY,
+    TODAY,
+  );
+  const saved = experimentsReducer([experiment], {
     type: "entrySaved",
-    experimentId: initial[0].id,
-    entry,
+    experimentId: experiment.id,
+    entry: first,
   });
-  assert.equal(saved[0].entries.length, initial[0].entries.length + 1);
-  const editedEntry = buildDailyEntry(
+  const edit = buildDailyEntry(
     saved[0],
-    { values: { ...values, sleep: 8 }, note: "Updated note" },
-    "replacement-id",
-    DEMO_DATE,
+    { habitStatus: "not_done", values: { energy: 4 }, note: "Changed" },
+    "replacement",
+    TODAY,
+    TODAY,
   );
-  const edited = experimentsReducer(saved, {
+  const next = experimentsReducer(saved, {
     type: "entrySaved",
-    experimentId: saved[0].id,
-    entry: editedEntry,
+    experimentId: experiment.id,
+    entry: edit,
   });
-  assert.equal(editedEntry.id, "entry-id");
-  assert.equal(edited[0].entries.length, saved[0].entries.length);
-  assert.equal(edited[0].entries.at(-1)?.values.sleep, 8);
-  assert.equal(edited[0].entries.at(-1)?.note, "Updated note");
-  assert.equal(saved[0].entries.at(-1)?.values.sleep, 5);
-  assert.equal(initial[0].entries.length, 19);
-  assert.equal(edited[1], saved[1]);
+  assert.equal(next[0].entries.length, 1);
+  assert.equal(next[0].entries[0].id, "first");
+  assert.equal(next[0].entries[0].habitStatus, "not_done");
+  assert.deepEqual(next[0].entries[0].values, { energy: 4 });
+  assert.equal(saved[0].entries[0].values.mood, 8);
+  assert.equal(experiment.entries.length, 0);
 });
-
-test("created experiments are added first without altering existing state", () => {
-  const result = buildExperiment(draft, "new-experiment", DEMO_DATE);
-  const state = experimentsReducer(MOCK_EXPERIMENTS, {
-    type: "experimentCreated",
-    experiment: result,
-  });
-  assert.equal(state[0], result);
-  assert.equal(state.length, MOCK_EXPERIMENTS.length + 1);
-  assert.equal(state[1], MOCK_EXPERIMENTS[0]);
+test("local calendar dates differ correctly from UTC on either side of midnight", () => {
+  const previous = process.env.TZ;
+  try {
+    process.env.TZ = "Pacific/Kiritimati";
+    assert.equal(localDate(new Date("2026-10-14T20:00:00Z")), "2026-10-15");
+    process.env.TZ = "America/Los_Angeles";
+    assert.equal(localDate(new Date("2026-10-14T01:00:00Z")), "2026-10-13");
+  } finally {
+    if (previous === undefined) delete process.env.TZ;
+    else process.env.TZ = previous;
+  }
+  assert.equal(dayOffset("2026-10-24", "2026-10-26"), 2);
+  assert.equal(dayOffset("2026-03-28", "2026-03-30"), 2);
 });
-
-test("formatters use English numbers, dates, and singular labels", () => {
+test("recorded-day progress is distinct from calendar progress", () => {
+  const stored = { ...experiment, entries: [entry(0, "not_done")] };
+  assert.equal(getProgress(stored, addDays(TODAY, 7)).day, 8);
+  assert.equal(getProgress(stored, addDays(TODAY, 7)).recorded, 1);
+  assert.equal(getProgress(stored, addDays(TODAY, 27)).completed, false);
+  assert.equal(getProgress(stored, addDays(TODAY, 28)).completed, true);
+  assert.equal(endDate(stored), addDays(TODAY, 27));
+});
+test("not done, unclassified imports, and a missing check-in are different", () => {
+  const groups = groupObservations([entry(0, "not_done"), entry(1, null), entry(2, "done")]);
+  assert.equal(groups.notDone.length, 1);
+  assert.equal(groups.done.length, 1);
+  assert.equal(groups.unclassified.length, 1);
+  assert.equal(groupObservations([]).notDone.length, 0);
+});
+test("averages count only available finite in-range scores", () => {
+  assert.deepEqual(
+    summarizeMetric(
+      [
+        entry(0, "done", { mood: 8 }),
+        entry(1, "done", {}),
+        entry(2, "done", { mood: NaN }),
+        entry(3, "done", { mood: Infinity }),
+        entry(4, "done", { mood: 11 }),
+      ],
+      "mood",
+    ),
+    { count: 1, average: 8 },
+  );
+  assert.deepEqual(summarizeMetric([], "mood"), { count: 0, average: null });
+});
+test("empty groups produce null differences instead of division by zero", () => {
+  const result = compareMetric([], "mood");
+  assert.equal(result.done.average, null);
+  assert.equal(result.notDone.average, null);
+  assert.equal(result.difference, null);
+  assert.equal(result.conclusion, "insufficient");
+  const one = compareMetric([entry(0, "done", { mood: 8 })], "mood");
+  assert.equal(one.difference, null);
+  assert.equal(one.enough, false);
+});
+test("comparison reports raw averages and differences after five scored days in each group", () => {
+  const rows = [
+    ...Array.from({ length: 5 }, (_, i) => entry(i, "done", { mood: 8 })),
+    ...Array.from({ length: 5 }, (_, i) => entry(i + 5, "not_done", { mood: 5 })),
+    entry(11, null, { mood: 10 }),
+  ];
+  const result = compareMetric(rows, "mood");
+  assert.equal(result.done.average, 8);
+  assert.equal(result.notDone.average, 5);
+  assert.equal(result.difference, 3);
+  assert.equal(result.conclusion, "higher");
+  assert.equal(result.done.count, 5);
+  assert.equal(comparisonText(result, "mood", t.analytics), t.analytics.higher("mood"));
+});
+test("threshold uses scored observations per metric, not total check-ins", () => {
+  const rows = [
+    ...Array.from({ length: 5 }, (_, i) => entry(i, "done", i === 0 ? {} : { mood: 8 })),
+    ...Array.from({ length: 5 }, (_, i) => entry(i + 5, "not_done", { mood: 5 })),
+  ];
+  const result = compareMetric(rows, "mood");
+  assert.equal(result.done.count, 4);
+  assert.equal(result.conclusion, "insufficient");
+  assert.equal(comparisonText(result, "mood", t.analytics), t.analytics.insufficient);
+  assert.equal(compareMetric(rows, "energy").conclusion, "insufficient");
+});
+test("rule-based comparisons support lower and similar scores without causal language", () => {
+  const rows = [
+    ...Array.from({ length: 5 }, (_, i) => entry(i, "done", { mood: 4 })),
+    ...Array.from({ length: 5 }, (_, i) => entry(i + 5, "not_done", { mood: 7 })),
+  ];
+  assert.equal(compareMetric(rows, "mood").conclusion, "lower");
+  assert.doesNotMatch(
+    comparisonText(compareMetric(rows, "mood"), "mood", t.analytics),
+    /caused|statistically significant/,
+  );
+  const similar = rows.map((row) => ({ ...row, values: { mood: 6 } }));
+  assert.equal(compareMetric(similar, "mood").conclusion, "similar");
+});
+test("legacy conversion preserves every original observation and never infers completion", () => {
+  for (const legacy of LEGACY_EXPERIMENTS) {
+    const copy = structuredClone(legacy);
+    const converted = adaptLegacyExperiment(legacy);
+    assert.deepEqual(converted.legacy, copy);
+    assert.equal(converted.entries.length, legacy.entries.length);
+    for (const [i, row] of converted.entries.entries()) {
+      assert.equal(row.habitStatus, null);
+      assert.deepEqual(row.values, legacy.entries[i].values);
+      assert.equal(row.note, legacy.entries[i].note);
+      assert.equal(row.observedDate, legacy.entries[i].date);
+      assert.equal(row.id, legacy.entries[i].id);
+    }
+    assert.equal(groupObservations(converted.entries).done.length, 0);
+    assert.equal(groupObservations(converted.entries).notDone.length, 0);
+    assert.deepEqual(legacy, copy);
+  }
+});
+test("version-one snapshots migrate explicitly and sample seeds remain fictional", () => {
+  const result = decodeWorkspace(JSON.stringify({ version: 1, experiments: LEGACY_EXPERIMENTS }));
+  assert.equal(result.migrated, true);
+  assert.equal(result.experiments[0].source, "user");
+  const seeds = createSampleExperiments(TODAY);
+  assert.equal(seeds.length, 4);
+  assert.ok(seeds.every((item) => item.source === "sample"));
+  assert.ok(seeds[0].entries.every((row) => row.observedDate < TODAY));
+});
+test("English formatters use the shared locale and correct singular labels", () => {
   assert.equal(formatNumber(6.25), "6.3");
-  assert.equal(formatCount(1, "entry", "entries"), "1 entry");
-  assert.equal(formatCount(2, "entry", "entries"), "2 entries");
-  assert.equal(formatDate(DEMO_DATE), "Oct 13");
+  assert.equal(formatCount(1, "entry"), "1 entry");
+  assert.equal(formatCount(2, "entry"), "2 entries");
+  assert.equal(formatDate(TODAY), "Oct 14");
+});
+
+test("new observations are restricted to today or yesterday while older saved dates remain editable", () => {
+  const startedEarlier = { ...experiment, startDate: addDays(TODAY, -10) };
+  for (const observedDate of [TODAY, addDays(TODAY, -1)]) {
+    const result = buildDailyEntry(
+      startedEarlier,
+      { habitStatus: "done", values: {} },
+      "id",
+      observedDate,
+      TODAY,
+      "2026-10-14T20:15:00.000Z",
+    );
+    assert.equal(result.observedDate, observedDate);
+    assert.equal(result.recordedAt, "2026-10-14T20:15:00.000Z");
+    assert.equal(result.updatedAt, null);
+  }
+  assert.throws(
+    () =>
+      buildDailyEntry(
+        startedEarlier,
+        { habitStatus: "not_done", values: {} },
+        "id",
+        addDays(TODAY, -2),
+        TODAY,
+      ),
+    coded("recentEntryOnly"),
+  );
+  const existing = { ...entry(5, "done"), recordedAt: "2026-10-09T18:00:00.000Z" };
+  const edited = buildDailyEntry(
+    { ...startedEarlier, entries: [existing] },
+    { habitStatus: "not_done", values: { mood: 4 } },
+    "replacement",
+    existing.observedDate,
+    TODAY,
+    "2026-10-14T20:20:00.000Z",
+  );
+  assert.equal(edited.observedDate, existing.observedDate);
+  assert.equal(edited.id, existing.id);
+  assert.equal(edited.recordedAt, existing.recordedAt);
+  assert.equal(edited.updatedAt, "2026-10-14T20:20:00.000Z");
 });

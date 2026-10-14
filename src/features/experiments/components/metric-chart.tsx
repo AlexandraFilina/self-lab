@@ -1,9 +1,10 @@
+import { t } from "@/i18n";
 import type { Experiment } from "@/features/experiments/model/types";
 import { dayOffset } from "@/features/experiments/model/analytics";
 import { METRICS } from "@/features/experiments/model/metrics";
 
 export function MetricChart({ experiment }: { experiment: Experiment }) {
-  const total = experiment.durationA + experiment.durationB;
+  const total = experiment.durationDays;
   const width = 640,
     height = 236,
     left = 30,
@@ -14,22 +15,15 @@ export function MetricChart({ experiment }: { experiment: Experiment }) {
     plotHeight = height - top - bottom;
   const x = (day: number) => left + ((day + 0.5) / total) * plotWidth;
   const y = (value: number) => top + ((10 - value) / 9) * plotHeight;
-  const split = left + (experiment.durationA / total) * plotWidth;
   const ticks = [
-    ...new Set([
-      1,
-      Math.ceil(experiment.durationA / 2),
-      experiment.durationA,
-      experiment.durationA + 1,
-      total,
-    ]),
+    ...new Set([1, Math.ceil(total / 4), Math.ceil(total / 2), Math.ceil((total * 3) / 4), total]),
   ];
 
   if (experiment.entries.length === 0)
     return (
       <div className="chart-empty">
-        <span>A fresh start</span>
-        <p>Add your first check-in to see how your scores change over time.</p>
+        <span>{t.experiments.chartEmpty}</span>
+        <p>{t.experiments.chartEmptyText}</p>
       </div>
     );
 
@@ -39,16 +33,8 @@ export function MetricChart({ experiment }: { experiment: Experiment }) {
         className="metric-chart"
         viewBox={`0 0 ${width} ${height}`}
         role="img"
-        aria-label="Daily scores on a scale of 1 to 10. Exact values are available in the daily check-ins table on the experiment page."
+        aria-label={t.experiments.chartLabel}
       >
-        <rect
-          x={split}
-          y={top - 15}
-          width={width - right - split}
-          height={plotHeight + 15}
-          rx="5"
-          fill="#f4f1ff"
-        />
         {[1, 4, 7, 10].map((value) => (
           <g key={value}>
             <line
@@ -64,27 +50,13 @@ export function MetricChart({ experiment }: { experiment: Experiment }) {
             </text>
           </g>
         ))}
-        <line
-          x1={split}
-          x2={split}
-          y1={top - 15}
-          y2={height - bottom}
-          stroke="#c9bfee"
-          strokeDasharray="4 5"
-        />
-        <text x={left + 8} y={14} fill="#848391" fontSize="11">
-          Period A
-        </text>
-        <text x={split + 8} y={14} fill="#7964c4" fontSize="11">
-          Period B
-        </text>
         {experiment.metrics.map((metric) => {
           let previousDay = -2;
           const points = experiment.entries.flatMap((entry) => {
             const value = entry.values[metric];
             if (value === undefined) return [];
-            const day = dayOffset(experiment.startDate, entry.date);
-            const point = { day, value, date: entry.date };
+            const day = dayOffset(experiment.startDate, entry.observedDate);
+            const point = { day, value, date: entry.observedDate };
             return [point];
           });
           const path = points
@@ -114,7 +86,9 @@ export function MetricChart({ experiment }: { experiment: Experiment }) {
                   stroke="white"
                   strokeWidth="1"
                 >
-                  <title>{`${METRICS[metric].label}: ${point.value} / 10 · day ${point.day + 1}`}</title>
+                  <title>
+                    {t.experiments.pointTitle(METRICS[metric].label, point.value, point.day + 1)}
+                  </title>
                 </circle>
               ))}
             </g>
@@ -142,7 +116,7 @@ export function MetricChart({ experiment }: { experiment: Experiment }) {
             </span>
           ))}
         </div>
-        <span>Experiment days</span>
+        <span>{t.experiments.chartDays}</span>
       </div>
     </div>
   );

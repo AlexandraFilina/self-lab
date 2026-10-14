@@ -1,8 +1,10 @@
 "use client";
 
+import { t } from "@/i18n";
+
 import Link from "next/link";
 import { formatCount, formatDate } from "@/lib/format";
-import { endDate, getProgress } from "@/features/experiments/model/analytics";
+import { endDate, getProgress, groupObservations } from "@/features/experiments/model/analytics";
 import { useExperiments } from "@/features/experiments/context/experiments-provider";
 import { DailyEntryButton } from "@/features/experiments/components/daily-entry";
 import { ExperimentProgress, StatusBadge } from "@/features/experiments/components/experiment-card";
@@ -18,24 +20,25 @@ export function Dashboard() {
   );
   const current = active[0];
   const progress = current ? getProgress(current, referenceDate) : null;
-  const todayEntry = current?.entries.some((entry) => entry.date === referenceDate);
+  const groups = current ? groupObservations(current.entries) : null;
+  const todayEntry = current?.entries.some((entry) => entry.observedDate === referenceDate);
   const stats: { label: string; value: number; caption: string; icon: IconName }[] = [
     {
-      label: "Active experiments",
+      label: t.dashboard.active,
       value: active.length,
-      caption: "Finding your rhythm",
+      caption: t.dashboard.activeCaption,
       icon: "flask",
     },
     {
-      label: "Daily check-ins",
+      label: t.dashboard.entries,
       value: experiments.reduce((sum, item) => sum + item.entries.length, 0),
-      caption: "Every entry is an observation",
+      caption: t.dashboard.entriesCaption,
       icon: "calendar",
     },
     {
-      label: "Completed experiments",
+      label: t.dashboard.completed,
       value: experiments.length - active.length,
-      caption: "Ready to compare",
+      caption: t.dashboard.completedCaption,
       icon: "chart",
     },
   ];
@@ -43,21 +46,21 @@ export function Dashboard() {
   return (
     <>
       <PageHeading
-        eyebrow="YOUR PERSONAL OVERVIEW"
-        title="Hello, curious mind"
-        description="Discover what helps you feel a little better."
+        eyebrow={t.dashboard.eyebrow}
+        title={t.dashboard.title}
+        description={t.dashboard.description}
         action={
           <Link href="/experiments/new" className="button button-primary">
             <Icon name="plus" />
-            New experiment
+            {t.common.newExperiment}
           </Link>
         }
       />
       <div className="welcome-note">
         <Icon name="sun" />
-        <span>A small observation today. A little more clarity tomorrow.</span>
+        <span>{t.dashboard.welcome}</span>
         <time dateTime={referenceDate}>
-          {formatDate(referenceDate, { day: "numeric", month: "long" })} · demo date
+          {formatDate(referenceDate, { day: "numeric", month: "long" })}
         </time>
       </div>
       <div className="stats-grid">
@@ -75,9 +78,9 @@ export function Dashboard() {
         ))}
       </div>
       <div className="section-heading dashboard-section">
-        <h2>In focus</h2>
+        <h2>{t.dashboard.focus}</h2>
         <Link href="/experiments" className="text-link">
-          All experiments
+          {t.dashboard.all}
           <Icon name="arrow" />
         </Link>
       </div>
@@ -93,39 +96,33 @@ export function Dashboard() {
                 </span>
               </div>
               <div className="section-heading">
-                <span className="eyebrow">CURRENT EXPERIMENT</span>
-                <StatusBadge experiment={current} />
+                <span className="eyebrow">{t.dashboard.current}</span>
+                <div className="card-badges">
+                  <StatusBadge experiment={current} />
+                  {current.source === "sample" && (
+                    <span className="neutral-badge">{t.common.sample}</span>
+                  )}
+                </div>
               </div>
               <h2>{current.title}</h2>
-              <p className="focus-hypothesis">{current.hypothesis}</p>
+              <p className="focus-hypothesis">{current.question}</p>
               <div className="period-cards">
-                <div
-                  className={
-                    progress.period === "A" ? "period-mini period-selected" : "period-mini"
-                  }
-                >
-                  <span className="period-letter">A</span>
+                <div className="period-mini period-selected">
+                  <span className="period-letter">
+                    <Icon name="check" />
+                  </span>
                   <div>
-                    <strong>Usual routine</strong>
-                    <small>
-                      {formatCount(current.durationA, "day")}
-                      {progress.period === "A" ? " · current" : " · finished"}
-                    </small>
+                    <strong>{t.common.done}</strong>
+                    <small>{formatCount(groups?.done.length ?? 0, "entry")}</small>
                   </div>
-                  {progress.period === "B" && <Icon name="check" />}
                 </div>
-                <div
-                  className={
-                    progress.period === "B" ? "period-mini period-selected" : "period-mini"
-                  }
-                >
-                  <span className="period-letter">B</span>
+                <div className="period-mini">
+                  <span className="period-letter">
+                    <Icon name="close" />
+                  </span>
                   <div>
-                    <strong>New conditions</strong>
-                    <small>
-                      {formatCount(current.durationB, "day")}
-                      {progress.period === "B" ? " · current" : " · up next"}
-                    </small>
+                    <strong>{t.common.notDone}</strong>
+                    <small>{formatCount(groups?.notDone.length ?? 0, "entry")}</small>
                   </div>
                 </div>
               </div>
@@ -135,8 +132,9 @@ export function Dashboard() {
                   <Icon name="calendar" />
                   {formatDate(current.startDate)} — {formatDate(endDate(current))}
                 </span>
+                <DailyEntryButton experiment={current} variant="ghost" />
                 <Link href={`/experiments/${current.id}`} className="text-link">
-                  View experiment
+                  {t.dashboard.view}
                   <Icon name="arrow" />
                 </Link>
               </div>
@@ -145,30 +143,23 @@ export function Dashboard() {
               <span className="icon-tile">
                 <Icon name={todayEntry ? "check" : "sun"} />
               </span>
-              <span className="eyebrow">YOUR NEXT STEP</span>
-              <h2>{todayEntry ? "Day checked in" : "A moment for yourself"}</h2>
-              <p>
-                {todayEntry
-                  ? "Thanks for checking in. You can edit your entry if your assessment changes."
-                  : "Reflect on your day. Even ordinary days help you see the bigger picture."}
-              </p>
+              <span className="eyebrow">{t.dashboard.next}</span>
+              <h2>{todayEntry ? t.dashboard.checked : t.dashboard.moment}</h2>
+              <p>{todayEntry ? t.dashboard.thanks : t.dashboard.reflect}</p>
               <div className="today-period">
-                <span>Period {progress.period}</span>
-                <strong>
-                  Day {progress.periodDay}
-                  <small> of {progress.periodDuration}</small>
-                </strong>
+                <span>{t.dashboard.today}</span>
+                <strong>{t.common.dayOf(progress.day, progress.total)}</strong>
               </div>
               <DailyEntryButton experiment={current} compact />
-              <small className="today-footnote">Demo session · resets on reload</small>
+              <small className="today-footnote">{t.dashboard.localNote}</small>
             </Card>
           </div>
           <div className="dashboard-bottom">
             <Card className="trend-card">
               <div className="section-heading">
                 <div>
-                  <h2>The rhythm of your days</h2>
-                  <p className="muted">Daily scores in your current experiment</p>
+                  <h2>{t.dashboard.trend}</h2>
+                  <p className="muted">{t.dashboard.trendText}</p>
                 </div>
                 <span className="neutral-badge">1–10</span>
               </div>
@@ -178,21 +169,18 @@ export function Dashboard() {
               <span className="icon-tile">
                 <Icon name="sparkles" />
               </span>
-              <p className="eyebrow">A BETTER EXPERIMENT</p>
+              <p className="eyebrow">{t.dashboard.better}</p>
               <h2>
-                Curiosity
+                {t.dashboard.curiosity}
                 <br />
-                over perfection
+                {t.dashboard.perfection}
               </h2>
-              <p>
-                Check in at around the same time each day. Note the context: stress, workload, or
-                anything unusual.
-              </p>
+              <p>{t.dashboard.advice}</p>
               <div className="reflection-divider" />
               <p className="reflection-bottom">
-                We compare observations.
+                {t.dashboard.observations}
                 <br />
-                They help reveal differences, but do not establish their cause.
+                {t.dashboard.limits}
               </p>
             </Card>
           </div>
@@ -202,11 +190,11 @@ export function Dashboard() {
           <span className="icon-tile">
             <Icon name="flask" />
           </span>
-          <h2>Time for a new question</h2>
-          <p>Start an experiment with one small change.</p>
+          <h2>{t.dashboard.empty}</h2>
+          <p>{t.dashboard.emptyText}</p>
           <Link href="/experiments/new" className="button button-primary">
             <Icon name="plus" />
-            New experiment
+            {t.common.newExperiment}
           </Link>
         </Card>
       )}

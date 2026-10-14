@@ -1,77 +1,110 @@
 "use client";
-
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { EXPERIMENT_LIMITS, getDailyEntrySchema } from "../model/schemas";
-import { METRICS } from "@/features/experiments/model/metrics";
+import { t } from "@/i18n";
+import { errorMessage } from "@/lib/errors";
+import { addDays } from "@/lib/dates";
 import { formatDate } from "@/lib/format";
-import { getProgress } from "@/features/experiments/model/analytics";
-import type { Experiment, MetricId } from "@/features/experiments/model/types";
-import { useExperiments } from "@/features/experiments/context/experiments-provider";
+import { endDate } from "../model/analytics";
+import { EXPERIMENT_LIMITS, getDailyEntrySchema } from "../model/schemas";
+import type { Experiment, HabitStatus, MetricValues } from "../model/types";
+import { useExperiments } from "../context/experiments-provider";
+import { MetricSlider } from "./metric-slider";
 import { Icon } from "@/components/icon";
-import { Button, Textarea } from "@/components/ui";
+import { Button, Textarea, cn } from "@/components/ui";
 
 export function DailyEntryButton({
   experiment,
   className,
   compact = false,
+  date,
+  row = false,
+  variant = "primary",
 }: {
   experiment: Experiment;
   className?: string;
   compact?: boolean;
+  date?: string;
+  row?: boolean;
+  variant?: "primary" | "secondary" | "ghost";
 }) {
   const { referenceDate } = useExperiments();
-  const [open, setOpen] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const existing = experiment.entries.some((entry) => entry.date === referenceDate);
-  if (getProgress(experiment, referenceDate).completed) return null;
+  const [openDate, setOpenDate] = useState<string | null>(null),
+    [saved, setSaved] = useState(false);
+  const yesterday = referenceDate ? addDays(referenceDate, -1) : "";
+  const withinWindow = (candidate: string) =>
+    Boolean(
+      candidate &&
+      candidate <= referenceDate &&
+      candidate >= experiment.startDate &&
+      candidate <= endDate(experiment),
+    );
+  const targetDate = date ?? [referenceDate, yesterday].find(withinWindow) ?? "";
+  const existing = experiment.entries.some((entry) => entry.observedDate === targetDate);
+  const canCheckIn = withinWindow(targetDate) && (existing || targetDate >= yesterday);
+  if (!canCheckIn && !openDate) return null;
   return (
     <div className={className}>
-      <Button
-        className="entry-button"
-        onClick={() => {
-          setSaved(false);
-          setOpen(true);
-        }}
-      >
-        <Icon name={existing ? "check" : "plus"} />
-        {existing ? "Edit check-in" : compact ? "Check in" : "Check in today"}
-      </Button>
+      {canCheckIn && (
+        <Button
+          className="entry-button"
+          variant={row ? "ghost" : variant}
+          onClick={() => {
+            setSaved(false);
+            setOpenDate(targetDate);
+          }}
+        >
+          <Icon name={existing ? "check" : "plus"} />
+          {row
+            ? t.common.edit
+            : existing
+              ? t.checkIn.edit
+              : compact || targetDate !== referenceDate
+                ? t.checkIn.check
+                : t.checkIn.today}
+        </Button>
+      )}
       {saved && (
         <p className="save-feedback" role="status">
-          Check-in saved for this demo session.
+          {t.checkIn.saved}
         </p>
       )}
-      {open && (
+      {openDate && (
         <EntryDialog
+          key={openDate}
+          onSelectDate={date ? undefined : setOpenDate}
           experiment={experiment}
-          onDismiss={() => setOpen(false)}
+          date={openDate}
+          onDismiss={() => setOpenDate(null)}
           onSaved={() => {
             setSaved(true);
-            setOpen(false);
+            setOpenDate(null);
           }}
         />
       )}
     </div>
   );
 }
-
 function EntryDialog({
   experiment,
+  date,
+  onSelectDate,
   onDismiss,
   onSaved,
 }: {
   experiment: Experiment;
+  date: string;
+  onSelectDate?: (date: string) => void;
   onDismiss: () => void;
   onSaved: () => void;
 }) {
   const { saveEntry, referenceDate } = useExperiments();
   const dialog = useRef<HTMLDialogElement>(null);
-  const existing = experiment.entries.find((entry) => entry.date === referenceDate);
-  const [values, setValues] = useState<Partial<Record<MetricId, number>>>(() =>
-    Object.fromEntries(experiment.metrics.map((metric) => [metric, existing?.values[metric] ?? 5])),
-  );
+  const existing = experiment.entries.find((entry) => entry.observedDate === date);
+  const [habitStatus, setHabitStatus] = useState<HabitStatus | null>(existing?.habitStatus ?? null);
+  const [values, setValues] = useState<MetricValues>(() => ({ ...existing?.values }));
   const [note, setNote] = useState(existing?.note ?? "");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(""),
+    [saving, setSaving] = useState(false);
   useEffect(() => {
     const element = dialog.current;
     element?.showModal();
@@ -79,83 +112,117 @@ function EntryDialog({
       element?.close();
     };
   }, []);
-
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const result = getDailyEntrySchema(experiment.metrics).safeParse({ values, note });
+    if (saving) return;
+    const result = getDailyEntrySchema(experiment.metrics).safeParse({ habitStatus, values, note });
     if (!result.success) {
       setError(result.error.issues[0].message);
       return;
     }
+    setError("");
+    setSaving(true);
     try {
-      saveEntry(experiment.id, result.data);
+      await saveEntry(experiment.id, result.data, date);
       onSaved();
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Could not save your check-in. Please try again.",
-      );
+      setError(errorMessage(cause));
+      setSaving(false);
     }
   }
-
   return (
     <dialog
       ref={dialog}
       className="entry-dialog"
       aria-labelledby="entry-title"
       aria-describedby="entry-description"
-      onClose={onDismiss}
+      onClose={(event) => {
+        if (!event.currentTarget.open) onDismiss();
+      }}
+      onCancel={(event) => {
+        if (saving) event.preventDefault();
+      }}
       onClick={(event) => {
-        if (event.target === event.currentTarget) onDismiss();
+        if (event.target === event.currentTarget && !saving) onDismiss();
       }}
     >
       <div className="dialog-content">
         <div className="section-heading">
-          <span className="eyebrow">DAILY OBSERVATION</span>
-          <Button variant="ghost" aria-label="Close" onClick={onDismiss}>
+          <span className="eyebrow">{t.checkIn.eyebrow}</span>
+          <Button variant="ghost" aria-label={t.common.close} disabled={saving} onClick={onDismiss}>
             <Icon name="close" />
           </Button>
         </div>
-        <h2 id="entry-title">How was your day?</h2>
+        <h2 id="entry-title">{t.checkIn.title}</h2>
         <p id="entry-description" className="muted">
-          {experiment.title} · {formatDate(referenceDate, { day: "numeric", month: "long" })}
+          {experiment.title} · {formatDate(date, { day: "numeric", month: "long" })}
         </p>
-        <form onSubmit={submit}>
+        <form noValidate onSubmit={submit}>
+          {onSelectDate && (
+            <>
+              <fieldset className="habit-options">
+                <legend className="field-label">{t.checkIn.observationDate}</legend>
+                {[
+                  { value: referenceDate, label: t.checkIn.todayOption },
+                  { value: addDays(referenceDate, -1), label: t.checkIn.yesterdayOption },
+                ].map((option) => (
+                  <Button
+                    key={option.value}
+                    type="button"
+                    variant={date === option.value ? "primary" : "secondary"}
+                    aria-pressed={date === option.value}
+                    disabled={
+                      saving ||
+                      option.value < experiment.startDate ||
+                      option.value > endDate(experiment)
+                    }
+                    onClick={() => onSelectDate(option.value)}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+              </fieldset>
+              <p className="field-hint">{t.checkIn.dateHelp}</p>
+            </>
+          )}
+          <fieldset className="habit-options">
+            <legend className="field-label">{t.checkIn.status}</legend>
+            {(["done", "not_done"] as const).map((status) => (
+              <label
+                key={status}
+                className={cn("habit-option", habitStatus === status && "habit-selected")}
+              >
+                <input
+                  type="radio"
+                  name="habitStatus"
+                  value={status}
+                  checked={habitStatus === status}
+                  required
+                  onChange={() => setHabitStatus(status)}
+                />
+                <Icon name={status === "done" ? "check" : "close"} />
+                {status === "done" ? t.common.done : t.common.notDone}
+              </label>
+            ))}
+          </fieldset>
+          {existing?.habitStatus === null && <p className="field-hint">{t.checkIn.legacyStatus}</p>}
+          <p className="field-hint">{t.checkIn.scoresHelp}</p>
           <div className="metric-sliders">
             {experiment.metrics.map((metric) => (
-              <div key={metric} className="metric-slider">
-                <div className="section-heading">
-                  <label htmlFor={`score-${metric}`}>{METRICS[metric].label}</label>
-                  <output htmlFor={`score-${metric}`} className="score-output">
-                    {values[metric]}
-                    <span> / 10</span>
-                  </output>
-                </div>
-                <p className="muted">{METRICS[metric].description}</p>
-                <input
-                  id={`score-${metric}`}
-                  type="range"
-                  min={EXPERIMENT_LIMITS.minScore}
-                  max={EXPERIMENT_LIMITS.maxScore}
-                  step="1"
-                  value={values[metric]}
-                  onChange={(event) =>
-                    setValues((current) => ({ ...current, [metric]: Number(event.target.value) }))
-                  }
-                  aria-valuetext={`${values[metric]} out of 10`}
-                />
-                <div className="range-labels">
-                  <span>1 — low score</span>
-                  <span>10 — high score</span>
-                </div>
-              </div>
+              <MetricSlider
+                key={metric}
+                metric={metric}
+                value={values[metric]}
+                onChange={(value) => setValues((current) => ({ ...current, [metric]: value }))}
+              />
             ))}
           </div>
           <label htmlFor="entry-note" className="field-label">
-            Note <span className="optional">optional</span>
+            {t.checkIn.noteLabel} <span className="optional">{t.common.optional}</span>
           </label>
           <Textarea
             id="entry-note"
-            placeholder="What might have influenced your scores?"
+            placeholder={t.checkIn.notePlaceholder}
             value={note}
             maxLength={EXPERIMENT_LIMITS.note}
             onChange={(event) => setNote(event.target.value)}
@@ -163,7 +230,7 @@ function EntryDialog({
           />
           <p className="form-demo-note">
             <Icon name="info" />
-            Demo mode: your entry is kept until you reload the page.
+            {t.checkIn.local}
           </p>
           {error && (
             <p className="form-error" role="alert">
@@ -171,12 +238,12 @@ function EntryDialog({
             </p>
           )}
           <div className="dialog-actions">
-            <Button variant="secondary" type="button" onClick={onDismiss}>
-              Cancel
+            <Button variant="secondary" type="button" disabled={saving} onClick={onDismiss}>
+              {t.common.cancel}
             </Button>
-            <Button type="submit">
+            <Button type="submit" disabled={saving}>
               <Icon name="check" />
-              Save check-in
+              {saving ? t.checkIn.saving : t.checkIn.save}
             </Button>
           </div>
         </form>

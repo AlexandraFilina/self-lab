@@ -1,0 +1,24 @@
+# Project rules
+
+- Work in this existing Next.js application. Preserve its visual design, palette, typography, logo, sidebar, and working components unless the user explicitly requests a change. Limit UI changes to the scenario being implemented.
+- Communicate with the user in Russian. Keep application UI, source identifiers, fixtures, documentation, and validation messages in English. Put user-facing copy in the typed localization dictionary.
+- Use strict TypeScript. Avoid `any`, duplicated logic, hidden errors, and disabled lint rules.
+- Keep UI, domain rules, analytics, and persistence separate. Use the existing feature structure and implement only necessary extension points.
+- Explain why a dependency is needed before adding it. Prefer the existing stack and small solutions.
+- Daily habit comparison is the current experiment mode. `done`, `not_done`, unclassified imported observations, and missing check-ins are distinct. Never infer that a missing check-in means the habit was not completed.
+- Preserve legacy sample data through explicit, tested migration. Do not silently rescale stored metrics or invent habit completion for old observations.
+- Use the user's local calendar date. New check-ins are limited to today/yesterday inside the experiment window; older saved observations remain editable. Keep observedDate separate from recordedAt/updatedAt and preserve unknown historical timestamps as null. Reject future check-ins and duplicate experiment/date pairs. Persist through the repository boundary, never directly from a UI component.
+- Clearly label browser-only storage and fictional samples. Never present non-persistent actions, missing integrations, or unavailable features as working.
+- Analytics must use saved observations and deterministic, tested rules. Handle missing values, empty groups, and small samples honestly. Do not use AI APIs for user conclusions, imply causation, or claim statistical significance without a justified method.
+- Add tests for domain logic and critical user flows. Run available formatting, lint, type, test, and production build checks after changes. Report commands actually run and their results.
+- Never publish secrets or user data. Do not rewrite Git history or force-push. Do not commit or push without the user's explicit confirmation for the current changes.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

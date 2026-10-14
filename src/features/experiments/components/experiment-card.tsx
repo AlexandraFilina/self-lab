@@ -1,5 +1,7 @@
 "use client";
 
+import { t } from "@/i18n";
+
 import { useExperiments } from "@/features/experiments/context/experiments-provider";
 import Link from "next/link";
 import type { Experiment } from "@/features/experiments/model/types";
@@ -15,7 +17,7 @@ export function StatusBadge({ experiment }: { experiment: Experiment }) {
   return (
     <span className={`status-badge ${completed ? "status-completed" : "status-active"}`}>
       <span />
-      {completed ? "Completed" : "In progress"}
+      {completed ? t.common.completed : t.common.active}
     </span>
   );
 }
@@ -26,7 +28,7 @@ export function ExperimentProgress({ experiment }: { experiment: Experiment }) {
   return (
     <div className="experiment-progress">
       <div className="progress-caption">
-        <span>Days checked in</span>
+        <span>{t.experiments.recorded}</span>
         <strong>
           {progress.recorded}
           <span> / {progress.total}</span>
@@ -35,7 +37,7 @@ export function ExperimentProgress({ experiment }: { experiment: Experiment }) {
       <div
         className="progress-track"
         role="progressbar"
-        aria-label="Days checked in"
+        aria-label={t.experiments.recorded}
         aria-valuemin={0}
         aria-valuemax={progress.total}
         aria-valuenow={progress.recorded}
@@ -63,12 +65,17 @@ export function ExperimentCard({ experiment }: { experiment: Experiment }) {
             }
           />
         </span>
-        <StatusBadge experiment={experiment} />
+        <div className="card-badges">
+          <StatusBadge experiment={experiment} />
+          {experiment.source === "sample" && (
+            <span className="neutral-badge">{t.common.sample}</span>
+          )}
+        </div>
       </div>
       <h2>
         <Link href={`/experiments/${experiment.id}`}>{experiment.title}</Link>
       </h2>
-      <p className="experiment-hypothesis">{experiment.hypothesis}</p>
+      <p className="experiment-hypothesis">{experiment.question}</p>
       <div className="metric-tags">
         {experiment.metrics.map((metric) => (
           <span key={metric}>
@@ -81,12 +88,12 @@ export function ExperimentCard({ experiment }: { experiment: Experiment }) {
       <div className="card-meta">
         <span>
           <Icon name="calendar" />
-          {formatCount(progress.total, "day")} · {experiment.durationA} + {experiment.durationB}
+          {formatCount(progress.total, "day")} · {t.experiments.daily}
         </span>
         <span>
           {progress.completed
-            ? "Ready to compare"
-            : `Period ${progress.period} · day ${progress.periodDay}`}
+            ? t.dashboard.completedCaption
+            : t.common.dayOf(progress.day, progress.total)}
         </span>
       </div>
       <div className="experiment-card-footer">
@@ -94,7 +101,7 @@ export function ExperimentCard({ experiment }: { experiment: Experiment }) {
           {formatDate(experiment.startDate)} — {formatDate(endDate(experiment))}
         </span>
         <Link href={`/experiments/${experiment.id}`} className="text-link">
-          View details
+          {t.common.viewDetails}
           <Icon name="arrow" />
         </Link>
       </div>
