@@ -95,7 +95,11 @@ export function ExperimentDetails({ id }: { id: string }) {
               : t.common.dayOf(progress.day, progress.total)}
           </h2>
           <p className="muted">
-            {progress.completed ? t.experiments.completedText : t.experiments.progressText}
+            {progress.completed
+              ? t.experiments.completedText
+              : experiment.entries.length === 0
+                ? t.onboarding.startToday
+                : t.experiments.progressText}
           </p>
         </div>
         <ExperimentProgress experiment={experiment} />

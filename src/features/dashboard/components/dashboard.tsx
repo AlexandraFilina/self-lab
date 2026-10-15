@@ -6,6 +6,8 @@ import Link from "next/link";
 import { formatCount, formatDate } from "@/lib/format";
 import { endDate, getProgress, groupObservations } from "@/features/experiments/model/analytics";
 import { useExperiments } from "@/features/experiments/context/experiments-provider";
+import { NewExperimentForm } from "@/features/experiments/components/new-experiment-form";
+import { needsOnboarding } from "@/features/experiments/model/onboarding";
 import { ExperimentLifecycle } from "@/features/experiments/components/experiment-lifecycle";
 import { DailyEntryButton } from "@/features/experiments/components/daily-entry";
 import { ExperimentProgress, StatusBadge } from "@/features/experiments/components/experiment-card";
@@ -16,6 +18,7 @@ import { Card } from "@/components/ui";
 
 export function Dashboard() {
   const { experiments, referenceDate } = useExperiments();
+  if (needsOnboarding(experiments)) return <NewExperimentForm onboarding />;
   const active = experiments.filter(
     (experiment) => !getProgress(experiment, referenceDate).completed,
   );

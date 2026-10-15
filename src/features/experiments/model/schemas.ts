@@ -79,10 +79,11 @@ const valuesSchema = z.partialRecord(
 );
 export const dateSchema = z.iso.date({ error: t.validation.date });
 export const timestampSchema = z.iso.datetime({ error: t.validation.timestamp });
+export const experimentQuestionSchema = text(t.form.question, EXPERIMENT_LIMITS.question);
 const previousNewExperimentSchema = z
   .object({
     title: text(t.form.name, 120),
-    question: text(t.form.question, 600),
+    question: experimentQuestionSchema,
     habit: text(t.form.habit, 500),
     durationDays: z
       .number({ error: t.validation.duration })

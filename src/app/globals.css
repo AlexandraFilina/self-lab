@@ -2374,3 +2374,28 @@ thead th {
 .detail-actions .lifecycle-controls {
   margin: 0;
 }
+
+.question-first-layout {
+  max-width: 740px;
+}
+.onboarding-ideas {
+  margin-top: 32px;
+}
+.onboarding-ideas h2 {
+  font-size: 16px;
+}
+.idea-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  gap: 10px;
+  margin: 18px 0;
+}
+.idea-grid .button {
+  white-space: normal;
+  text-align: left;
+  justify-content: flex-start;
+  min-height: 48px;
+}
+.idea-grid [aria-pressed="true"] {
+  border-color: var(--primary);
+}

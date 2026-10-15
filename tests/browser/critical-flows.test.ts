@@ -157,7 +157,7 @@ class Browser {
 }
 
 test(
-  "critical browser flows: check-ins, results, lifecycle, reload, and responsive UI",
+  "critical browser flows: onboarding, check-ins, results, lifecycle, reload, and responsive UI",
   { timeout: 120000 },
   async () => {
     const executable = [
@@ -270,7 +270,181 @@ test(
         assert.ok(found);
         return found;
       }
+      const onboardingHeading = "What would you like to understand about yourself?";
+      await navigate("/dashboard", onboardingHeading);
+      const pristine = await workspace();
+      await page.evaluate(
+        "localStorage.setItem('self-lab:experiments',JSON.stringify({version:5,experiments:[]}))",
+      );
+      await navigate("/dashboard", onboardingHeading);
+      assert.equal((await workspace()).experiments.length, 0);
+      assert.equal(await page.evaluate("globalThis.__qa('.stat-card').length"), 0);
+      await page.evaluate(
+        `localStorage.setItem('self-lab:experiments',${JSON.stringify(JSON.stringify(pristine))})`,
+      );
+      await navigate("/dashboard", onboardingHeading);
+      assert.equal(
+        await page.evaluate("globalThis.__q('#onboarding-experiment-question').value"),
+        "",
+      );
+      assert.equal(
+        await page.evaluate("globalThis.__qa('#onboarding-experiment-title').length"),
+        0,
+      );
+      assert.equal(await page.evaluate("globalThis.__qa('input[name=metrics]:checked').length"), 0);
+      await page.screenshot(join(profile, "onboarding-desktop.png"));
+      await page.send("Emulation.setDeviceMetricsOverride", {
+        width: 390,
+        height: 844,
+        deviceScaleFactor: 1,
+        mobile: true,
+      });
+      assert.ok(await page.evaluate("document.documentElement.scrollWidth<=window.innerWidth"));
+      await page.screenshot(join(profile, "onboarding-mobile.png"));
+      await page.send("Emulation.setDeviceMetricsOverride", {
+        width: 1440,
+        height: 1100,
+        deviceScaleFactor: 1,
+        mobile: false,
+      });
+      await page.click("Experiments", ".nav-link");
+      await page.wait("!!globalThis.__q('.filter-tabs')");
+      await page.click("New experiment", "a");
+      await page.wait("!!globalThis.__q('#experiment-question')");
+      assert.ok(
+        await page.evaluate(
+          "(()=>{const ids=[...document.querySelectorAll('form [id]')].map(e=>e.id);return new Set(ids).size===ids.length})()",
+        ),
+      );
+      await page.click("Your question", "label");
+      assert.ok(
+        await page.evaluate("document.activeElement===globalThis.__q('#experiment-question')"),
+      );
+      await page.click("Dashboard", ".nav-link");
+      await page.wait(`globalThis.__q('h1')?.textContent===${JSON.stringify(onboardingHeading)}`);
+      await page.click("Continue");
+      await page.wait(
+        "globalThis.__q('form [role=alert]')?.textContent==='Your question is required.'",
+      );
+      assert.equal(
+        (await workspace()).experiments.filter((item) => item.source === "user").length,
+        0,
+      );
+      await page.fill(
+        "#onboarding-experiment-question",
+        "How does reading before bed relate to my sleep?",
+      );
+      await page.click("Continue");
+      await page.wait("!!globalThis.__q('#onboarding-experiment-title')");
+      assert.equal(await page.evaluate("globalThis.__q('#onboarding-experiment-title').value"), "");
+      assert.equal(await page.evaluate("globalThis.__q('#onboarding-experiment-habit').value"), "");
+      assert.equal(await page.evaluate("globalThis.__qa('input[name=metrics]:checked').length"), 0);
+      await page.fill("#onboarding-experiment-title", "First onboarding experiment");
+      await page.fill("#onboarding-experiment-habit", "Read before bed");
+      await page.click("Create experiment");
+      await page.wait(
+        "globalThis.__q('form [role=alert]')?.textContent==='Choose at least one metric to track.'",
+      );
+      await page.evaluate("globalThis.__q('input[name=metrics][value=sleep]').click()");
+      await page.click("+ Add custom metric");
+      await page.fill("#onboarding-custom-metric-name", "Restfulness");
+      await page.click("Add metric");
+      await page.fill("#onboarding-duration-days", "21");
+      await page.click("Create experiment");
+      await page.wait("globalThis.__q('h1')?.textContent==='First onboarding experiment'");
+      const onboardingId = (await page.evaluate<string>("location.pathname")).split("/").at(-1);
+      assert.ok(onboardingId);
+      const onboarded = await userExperiment(onboardingId);
+      assert.equal(onboarded.status, "active");
+      assert.equal(onboarded.source, "user");
+      assert.equal(onboarded.entries.length, 0);
+      assert.equal(onboarded.durationDays, 21);
+      assert.ok(onboarded.metrics.some((metric) => metric.id === "sleep"));
+      assert.ok(
+        onboarded.metrics.some(
+          (metric) => metric.kind === "custom" && metric.label === "Restfulness",
+        ),
+      );
+      assert.ok(
+        await page.evaluate(
+          "globalThis.__qa('.detail-actions button').some(e=>e.textContent.trim()==='Check in today')",
+        ),
+      );
+      assert.ok(
+        await page.evaluate(
+          "globalThis.__q('.detail-progress-card').textContent.includes('Start observing today')",
+        ),
+      );
+      await navigate(`/experiments/${onboardingId}`, "First onboarding experiment");
+      assert.deepEqual(await userExperiment(onboardingId), onboarded);
       await navigate("/dashboard", "Hello, curious mind");
+      assert.equal(
+        await page.evaluate("globalThis.__qa('#onboarding-experiment-question').length"),
+        0,
+      );
+      await navigate("/experiments", "My experiments");
+      const onboardingActive = await page.evaluate<string>(
+        "globalThis.__qa('.filter-tab').find(e=>e.textContent.startsWith('In progress')).textContent",
+      );
+      await page.click(onboardingActive, ".filter-tab");
+      assert.ok(
+        await page.evaluate(
+          `globalThis.__qa('.experiment-card h2 a').some(e=>e.getAttribute('href')==='/experiments/${onboardingId}')`,
+        ),
+      );
+      await navigate("/experiments/new", "Start with curiosity");
+      assert.equal(await page.evaluate("globalThis.__q('#experiment-question').value"), "");
+      await page.click("Coffee & sleep", ".idea-grid button");
+      assert.equal(
+        await page.evaluate("globalThis.__q('#experiment-question').value"),
+        "Does coffee after lunch affect how I sleep?",
+      );
+      await page.click("Continue");
+      await page.wait("!!globalThis.__q('#experiment-title')");
+      assert.equal(
+        await page.evaluate("globalThis.__q('#experiment-title').value"),
+        "Afternoon coffee and sleep",
+      );
+      assert.equal(
+        await page.evaluate("globalThis.__q('#experiment-habit').value"),
+        "Avoid coffee after lunch",
+      );
+      assert.equal(
+        await page.evaluate("globalThis.__q('input[name=metrics][value=sleep]').checked"),
+        true,
+      );
+      await page.fill("#experiment-title", "Edited idea experiment");
+      await page.fill("#experiment-question", "How does my afternoon routine relate to sleep?");
+      await page.fill("#experiment-habit", "Choose decaf after lunch");
+      await page.fill("#duration-days", "28");
+      await page.click("Back to question");
+      await page.wait("!!globalThis.__q('.idea-grid')");
+      assert.equal(
+        await page.evaluate("globalThis.__q('#experiment-question').value"),
+        "How does my afternoon routine relate to sleep?",
+      );
+      await page.click("Continue");
+      await page.wait("!!globalThis.__q('#experiment-title')");
+      assert.equal(
+        await page.evaluate("globalThis.__q('#experiment-title').value"),
+        "Edited idea experiment",
+      );
+      assert.equal(await page.evaluate("globalThis.__q('#duration-days').value"), "28");
+      await page.click("Create experiment");
+      await page.wait("globalThis.__q('h1')?.textContent==='Edited idea experiment'");
+      const ideaId = (await page.evaluate<string>("location.pathname")).split("/").at(-1);
+      assert.ok(ideaId);
+      const editedIdea = await userExperiment(ideaId);
+      assert.equal(editedIdea.habit, "Choose decaf after lunch");
+      assert.equal(editedIdea.question, "How does my afternoon routine relate to sleep?");
+      assert.equal(editedIdea.durationDays, 28);
+      assert.equal(editedIdea.entries.length, 0);
+      await navigate(`/experiments/${ideaId}`, "Edited idea experiment");
+      assert.deepEqual(await userExperiment(ideaId), editedIdea);
+      await page.evaluate(
+        `localStorage.setItem('self-lab:experiments',${JSON.stringify(JSON.stringify(pristine))})`,
+      );
+      await navigate("/dashboard", onboardingHeading);
       assert.equal(await page.evaluate("document.documentElement.lang"), "en");
       assert.equal(await page.evaluate("/[А-Яа-яЁё]/.test(document.body.textContent)"), false);
       await page.screenshot(join(profile, "dashboard-desktop.png"));
@@ -286,7 +460,7 @@ test(
       await page.evaluate(
         `localStorage.setItem('self-lab:experiments',${JSON.stringify(JSON.stringify(initial))})`,
       );
-      await navigate("/dashboard", "Hello, curious mind");
+      await navigate("/dashboard", onboardingHeading);
       assert.deepEqual(
         (await workspace()).experiments.map((item) => item.id),
         ["morning-walk-completed"],
@@ -365,6 +539,9 @@ test(
       assert.ok(editedYesterday?.updatedAt);
 
       await page.click("New experiment", "a");
+      await page.wait("!!globalThis.__q('#experiment-question')");
+      await page.fill("#experiment-question", "Do walks relate to my mood?");
+      await page.click("Continue");
       await page.wait("!!globalThis.__q('#experiment-title')");
       await page.click("Create experiment");
       await page.wait(
@@ -391,9 +568,13 @@ test(
       await page.click("Experiments", ".nav-link");
       await page.wait("!!globalThis.__q('.filter-tabs')");
       await page.click("New experiment", "a");
+      await page.wait("!!globalThis.__q('#experiment-question')");
+      assert.equal(await page.evaluate("globalThis.__q('#experiment-question').value"), "");
+      assert.equal(await page.evaluate("globalThis.__qa('#experiment-title').length"), 0);
+      await page.fill("#experiment-question", "How does this habit relate to energy?");
+      await page.click("Continue");
       await page.wait("!!globalThis.__q('#experiment-title')");
       assert.equal(await page.evaluate("globalThis.__q('#experiment-title').value"), "");
-      assert.equal(await page.evaluate("globalThis.__q('#experiment-question').value"), "");
       assert.equal(await page.evaluate("globalThis.__q('#experiment-habit').value"), "");
       assert.equal(await page.evaluate("globalThis.__q('#duration-days').value"), "14");
       assert.equal(await page.evaluate("globalThis.__qa('input[name=metrics]:checked').length"), 0);
@@ -587,6 +768,10 @@ test(
         ),
       );
       await navigate("/experiments/new", "Start with curiosity");
+      assert.equal(await page.evaluate("globalThis.__q('#experiment-question').value"), "");
+      await page.fill("#experiment-question", "An abandoned question");
+      await page.click("Continue");
+      await page.wait("!!globalThis.__q('#experiment-title')");
       assert.equal(await page.evaluate("globalThis.__qa('input[name=metrics]:checked').length"), 0);
       assert.equal(await page.evaluate("globalThis.__qa('[data-custom-metric-id]').length"), 0);
       await page.fill("#experiment-title", "An abandoned draft");
@@ -597,6 +782,10 @@ test(
       await page.click("Experiments", ".nav-link");
       await page.wait("!!globalThis.__q('.filter-tabs')");
       await page.click("New experiment", "a");
+      await page.wait("!!globalThis.__q('#experiment-question')");
+      assert.equal(await page.evaluate("globalThis.__q('#experiment-question').value"), "");
+      await page.fill("#experiment-question", "A fresh question");
+      await page.click("Continue");
       await page.wait("!!globalThis.__q('#experiment-title')");
       assert.equal(await page.evaluate("globalThis.__q('#experiment-title').value"), "");
       assert.equal(await page.evaluate("globalThis.__qa('[data-custom-metric-id]').length"), 0);

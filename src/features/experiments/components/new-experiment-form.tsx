@@ -4,7 +4,9 @@ import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState, type FormEvent } from "react";
 import { t } from "@/i18n";
 import { errorMessage } from "@/lib/errors";
-import { EXPERIMENT_LIMITS, newExperimentSchema } from "../model/schemas";
+import { EXPERIMENT_IDEAS, type ExperimentIdea } from "../data/experiment-ideas";
+import { createEmptyExperimentDraft, createIdeaDraft } from "../model/onboarding";
+import { EXPERIMENT_LIMITS, newExperimentSchema, experimentQuestionSchema } from "../model/schemas";
 import { METRICS, builtInMetric, hasDuplicateMetric } from "../model/metrics";
 import { buildCustomMetric } from "../model/actions";
 import { METRIC_IDS, type CustomMetricDefinition } from "../model/types";
@@ -13,9 +15,14 @@ import { Icon } from "@/components/icon";
 import { PageHeading } from "@/components/page-heading";
 import { Button, Card, Input, Textarea } from "@/components/ui";
 
-export function NewExperimentForm() {
+export function NewExperimentForm({ onboarding = false }: { onboarding?: boolean }) {
   const router = useRouter();
-  const { createExperiment } = useExperiments();
+  const fieldId = (name: string) => (onboarding ? `onboarding-${name}` : name);
+  const { createExperiment, experiments } = useExperiments();
+  const [step, setStep] = useState<"question" | "details">("question");
+  const [fields, setFields] = useState(createEmptyExperimentDraft);
+  const [selectedIdea, setSelectedIdea] = useState<string | null>(null);
+  const sample = experiments.find((experiment) => experiment.source === "sample");
   const formRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -47,6 +54,9 @@ export function NewExperimentForm() {
     }
   }
   const reset = useCallback(() => {
+    setStep("question");
+    setFields(createEmptyExperimentDraft());
+    setSelectedIdea(null);
     setError("");
     setCustomMetrics([]);
     setCustomOpen(false);
@@ -63,9 +73,25 @@ export function NewExperimentForm() {
     },
     [reset],
   );
+  function applyIdea(idea: ExperimentIdea) {
+    reset();
+    setFields(createIdeaDraft(idea));
+    setSelectedIdea(idea.id);
+    formRef.current?.querySelector<HTMLTextAreaElement>('[name="question"]')?.focus();
+  }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (saving) return;
+    if (step === "question") {
+      const result = experimentQuestionSchema.safeParse(fields.question);
+      if (!result.success) {
+        setError(result.error.issues[0].message);
+        return;
+      }
+      setError("");
+      setStep("details");
+      return;
+    }
     if (customOpen) {
       setError(t.form.pendingCustomMetric);
       return;
@@ -97,11 +123,17 @@ export function NewExperimentForm() {
   }
   return (
     <>
-      <Link href="/experiments" className="back-link">
-        {t.common.back}
-      </Link>
-      <PageHeading eyebrow={t.form.eyebrow} title={t.form.title} description={t.form.description} />
-      <div className="form-layout">
+      {!onboarding && (
+        <Link href="/experiments" className="back-link">
+          {t.common.back}
+        </Link>
+      )}
+      <PageHeading
+        eyebrow={t.form.eyebrow}
+        title={onboarding ? t.onboarding.heading : t.form.title}
+        description={onboarding ? t.onboarding.description : t.form.description}
+      />
+      <div className={step === "question" ? "question-first-layout" : "form-layout"}>
         <form
           ref={attachForm}
           noValidate
@@ -118,230 +150,308 @@ export function NewExperimentForm() {
               </div>
             </div>
             <div className="form-field">
-              <label htmlFor="experiment-title" className="field-label">
-                {t.form.name}
-              </label>
-              <Input
-                id="experiment-title"
-                name="title"
-                placeholder={t.form.namePlaceholder}
-                required
-                maxLength={EXPERIMENT_LIMITS.title}
-              />
-            </div>
-            <div className="form-field">
-              <label htmlFor="experiment-question" className="field-label">
+              <label htmlFor={fieldId("experiment-question")} className="field-label">
                 {t.form.question}
               </label>
               <Textarea
-                id="experiment-question"
+                id={fieldId("experiment-question")}
                 name="question"
                 placeholder={t.form.questionPlaceholder}
                 required
                 maxLength={EXPERIMENT_LIMITS.question}
                 rows={3}
+                value={fields.question}
+                onChange={(event) =>
+                  setFields((current) => ({ ...current, question: event.target.value }))
+                }
               />
             </div>
-          </Card>
-          <Card className="form-card">
-            <div className="form-section-title">
-              <span className="step-number">02</span>
-              <div>
-                <h2>{t.form.habitTitle}</h2>
-                <p className="muted">{t.form.habitHelp}</p>
-              </div>
-            </div>
-            <div className="form-field">
-              <label htmlFor="experiment-habit" className="field-label">
-                {t.form.habit}
-              </label>
-              <Textarea
-                id="experiment-habit"
-                name="habit"
-                placeholder={t.form.habitPlaceholder}
-                required
-                maxLength={EXPERIMENT_LIMITS.habit}
-                rows={3}
-              />
-            </div>
-            <div className="form-field">
-              <label htmlFor="duration-days" className="field-label">
-                {t.form.duration}
-              </label>
-              <div className="duration-input">
-                <Input
-                  id="duration-days"
-                  name="durationDays"
-                  type="number"
-                  min={EXPERIMENT_LIMITS.minDays}
-                  max={EXPERIMENT_LIMITS.maxDays}
-                  step={1}
-                  required
-                  defaultValue={14}
-                />
-                <span>{t.form.days}</span>
-              </div>
-              <p className="field-hint">{t.form.durationHelp}</p>
-            </div>
-          </Card>
-          <Card className="form-card">
-            <div className="form-section-title">
-              <span className="step-number">03</span>
-              <div>
-                <h2>{t.form.metricsTitle}</h2>
-                <p className="muted">{t.form.metricsHelp}</p>
-              </div>
-            </div>
-            <fieldset className="metric-options">
-              <legend className="sr-only">{t.form.legend}</legend>
-              {METRIC_IDS.map((metric) => (
-                <label key={metric} className="metric-option">
-                  <input type="checkbox" name="metrics" value={metric} />
-                  <span>
-                    <strong>{METRICS[metric].label}</strong>
-                    <small>{METRICS[metric].description}</small>
-                  </span>
+            {step === "details" && (
+              <div className="form-field">
+                <label htmlFor={fieldId("experiment-title")} className="field-label">
+                  {t.form.name}
                 </label>
-              ))}
-              {customMetrics.map((metric) => (
-                <div
-                  key={metric.id}
-                  className="metric-option metric-option-selected custom-metric-option"
-                  data-custom-metric-id={metric.id}
-                >
-                  <span>
-                    <strong>{metric.label}</strong>
-                    <small>{t.form.customMetricHint}</small>
-                  </span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    disabled={saving}
-                    aria-label={t.form.removeMetric(metric.label)}
-                    onClick={() => {
-                      setCustomMetrics((current) =>
-                        current.filter((item) => item.id !== metric.id),
-                      );
-                      setMetricError("");
-                      setError("");
-                    }}
-                  >
-                    <Icon name="close" />
-                  </Button>
+                <Input
+                  autoFocus
+                  id={fieldId("experiment-title")}
+                  name="title"
+                  placeholder={t.form.namePlaceholder}
+                  value={fields.title}
+                  onChange={(event) =>
+                    setFields((current) => ({ ...current, title: event.target.value }))
+                  }
+                  required
+                  maxLength={EXPERIMENT_LIMITS.title}
+                />
+              </div>
+            )}
+          </Card>
+          {step === "details" && (
+            <>
+              <Card className="form-card">
+                <div className="form-section-title">
+                  <span className="step-number">02</span>
+                  <div>
+                    <h2>{t.form.habitTitle}</h2>
+                    <p className="muted">{t.onboarding.habitPrompt}</p>
+                  </div>
                 </div>
-              ))}
-            </fieldset>
-            <div className="custom-metric-editor">
-              {customOpen ? (
-                <>
-                  <label htmlFor="custom-metric-name" className="field-label">
-                    {t.form.customMetricName}
+                <div className="form-field">
+                  <label htmlFor={fieldId("experiment-habit")} className="field-label">
+                    {t.form.habit}
                   </label>
-                  <Input
-                    id="custom-metric-name"
-                    name="customMetricName"
-                    value={customName}
-                    autoFocus
+                  <Textarea
+                    id={fieldId("experiment-habit")}
+                    name="habit"
+                    placeholder={t.form.habitPlaceholder}
                     required
-                    maxLength={EXPERIMENT_LIMITS.customMetricLabel}
-                    placeholder={t.form.customMetricPlaceholder}
-                    disabled={saving}
-                    onChange={(event) => setCustomName(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        addCustomMetric();
-                      }
-                    }}
+                    maxLength={EXPERIMENT_LIMITS.habit}
+                    value={fields.habit}
+                    onChange={(event) =>
+                      setFields((current) => ({ ...current, habit: event.target.value }))
+                    }
+                    rows={3}
                   />
-                  <div className="custom-metric-actions">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      disabled={saving}
-                      onClick={addCustomMetric}
+                </div>
+              </Card>
+              <Card className="form-card">
+                <div className="form-section-title">
+                  <span className="step-number">03</span>
+                  <div>
+                    <h2>{t.form.metricsTitle}</h2>
+                    <p className="muted">{t.onboarding.metricsPrompt}</p>
+                  </div>
+                </div>
+                <fieldset className="metric-options">
+                  <legend className="sr-only">{t.form.legend}</legend>
+                  {METRIC_IDS.map((metric) => (
+                    <label key={metric} className="metric-option">
+                      <input
+                        type="checkbox"
+                        name="metrics"
+                        value={metric}
+                        checked={fields.metrics.some((item) => item.id === metric)}
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          setFields((current) => ({
+                            ...current,
+                            metrics: checked
+                              ? [...current.metrics, builtInMetric(metric)]
+                              : current.metrics.filter((item) => item.id !== metric),
+                          }));
+                        }}
+                      />
+                      <span>
+                        <strong>{METRICS[metric].label}</strong>
+                        <small>{METRICS[metric].description}</small>
+                      </span>
+                    </label>
+                  ))}
+                  {customMetrics.map((metric) => (
+                    <div
+                      key={metric.id}
+                      className="metric-option metric-option-selected custom-metric-option"
+                      data-custom-metric-id={metric.id}
                     >
-                      {t.form.addMetric}
-                    </Button>
+                      <span>
+                        <strong>{metric.label}</strong>
+                        <small>{t.form.customMetricHint}</small>
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        disabled={saving}
+                        aria-label={t.form.removeMetric(metric.label)}
+                        onClick={() => {
+                          setCustomMetrics((current) =>
+                            current.filter((item) => item.id !== metric.id),
+                          );
+                          setMetricError("");
+                          setError("");
+                        }}
+                      >
+                        <Icon name="close" />
+                      </Button>
+                    </div>
+                  ))}
+                </fieldset>
+                <div className="custom-metric-editor">
+                  {customOpen ? (
+                    <>
+                      <label htmlFor={fieldId("custom-metric-name")} className="field-label">
+                        {t.form.customMetricName}
+                      </label>
+                      <Input
+                        id={fieldId("custom-metric-name")}
+                        name="customMetricName"
+                        value={customName}
+                        autoFocus
+                        required
+                        maxLength={EXPERIMENT_LIMITS.customMetricLabel}
+                        placeholder={t.form.customMetricPlaceholder}
+                        disabled={saving}
+                        onChange={(event) => setCustomName(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            addCustomMetric();
+                          }
+                        }}
+                      />
+                      <div className="custom-metric-actions">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          disabled={saving}
+                          onClick={addCustomMetric}
+                        >
+                          {t.form.addMetric}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          disabled={saving}
+                          onClick={() => {
+                            setCustomOpen(false);
+                            setCustomName("");
+                            setMetricError("");
+                          }}
+                        >
+                          {t.common.cancel}
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
                     <Button
                       type="button"
                       variant="ghost"
                       disabled={saving}
-                      onClick={() => {
-                        setCustomOpen(false);
-                        setCustomName("");
-                        setMetricError("");
-                      }}
+                      onClick={() => setCustomOpen(true)}
                     >
-                      {t.common.cancel}
+                      {t.form.addCustomMetric}
                     </Button>
+                  )}
+                  {metricError && (
+                    <p className="form-error" role="alert">
+                      {metricError}
+                    </p>
+                  )}
+                </div>
+              </Card>
+              <Card className="form-card">
+                <div className="form-section-title">
+                  <span className="step-number">04</span>
+                  <div>
+                    <h2>{t.form.duration}</h2>
+                    <p className="muted">{t.form.durationHelp}</p>
                   </div>
-                </>
-              ) : (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={saving}
-                  onClick={() => setCustomOpen(true)}
-                >
-                  {t.form.addCustomMetric}
-                </Button>
-              )}
-              {metricError && (
-                <p className="form-error" role="alert">
-                  {metricError}
-                </p>
-              )}
-            </div>
-          </Card>
+                </div>
+                <div className="form-field">
+                  <label htmlFor={fieldId("duration-days")} className="field-label">
+                    {t.form.duration}
+                  </label>
+                  <div className="duration-input">
+                    <Input
+                      id={fieldId("duration-days")}
+                      name="durationDays"
+                      type="number"
+                      min={EXPERIMENT_LIMITS.minDays}
+                      max={EXPERIMENT_LIMITS.maxDays}
+                      step={1}
+                      required
+                      value={fields.durationDays || ""}
+                      onChange={(event) =>
+                        setFields((current) => ({
+                          ...current,
+                          durationDays: Number(event.target.value),
+                        }))
+                      }
+                    />
+                    <span>{t.form.days}</span>
+                  </div>
+                </div>
+              </Card>
+            </>
+          )}
           {error && (
             <p className="form-error" role="alert">
               {error}
             </p>
           )}
           <div className="form-submit">
-            <Link
-              href="/experiments"
-              className="button button-secondary"
-              onClick={(event) => {
-                if (saving) {
-                  event.preventDefault();
-                  return;
-                }
-                formRef.current?.reset();
-              }}
-            >
-              {t.common.cancel}
-            </Link>
+            {step === "details" && (
+              <Button
+                variant="secondary"
+                type="button"
+                disabled={saving}
+                onClick={() => {
+                  setStep("question");
+                  setError("");
+                }}
+              >
+                {t.onboarding.back}
+              </Button>
+            )}
             <Button type="submit" disabled={saving}>
-              <Icon name="plus" />
-              {saving ? t.form.saving : t.common.createExperiment}
+              {step === "details" && <Icon name="plus" />}
+              {saving
+                ? t.form.saving
+                : step === "question"
+                  ? t.onboarding.continue
+                  : t.common.createExperiment}
             </Button>
           </div>
+          {step === "question" && (
+            <section className="onboarding-ideas" aria-labelledby={fieldId("ideas-title")}>
+              <h2 id={fieldId("ideas-title")}>{t.onboarding.ideasTitle}</h2>
+              <p className="field-hint">{t.onboarding.ideasNotice}</p>
+              <div className="idea-grid">
+                {EXPERIMENT_IDEAS.map((idea) => (
+                  <Button
+                    key={idea.id}
+                    type="button"
+                    variant="secondary"
+                    aria-pressed={selectedIdea === idea.id}
+                    onClick={() => applyIdea(idea)}
+                  >
+                    {idea.label}
+                  </Button>
+                ))}
+              </div>
+              {onboarding && sample && (
+                <Link href={`/experiments/${sample.id}`} className="text-link">
+                  {t.onboarding.sampleLink}
+                  <Icon name="arrow" />
+                </Link>
+              )}
+            </section>
+          )}
           <p className="form-demo-note">
             <Icon name="info" />
             {t.form.local}
           </p>
         </form>
-        <aside className="form-advice">
-          <Card>
-            <span className="icon-tile">
-              <Icon name="sparkles" />
-            </span>
-            <h2>{t.form.adviceTitle}</h2>
-            <p>{t.form.advice}</p>
-            {[t.form.tipOne, t.form.tipTwo, t.form.tipThree].map((tip, index) => (
-              <div key={tip} className="advice-item">
-                <span>{index + 1}</span>
-                <p>{tip}</p>
+        {step === "details" && (
+          <aside className="form-advice">
+            <Card>
+              <span className="icon-tile">
+                <Icon name="sparkles" />
+              </span>
+              <h2>{t.form.adviceTitle}</h2>
+              <p>{t.form.advice}</p>
+              {[t.form.tipOne, t.form.tipTwo, t.form.tipThree].map((tip, index) => (
+                <div key={tip} className="advice-item">
+                  <span>{index + 1}</span>
+                  <p>{tip}</p>
+                </div>
+              ))}
+              <div className="insight-note">
+                <Icon name="info" />
+                <p>{t.form.limitations}</p>
               </div>
-            ))}
-            <div className="insight-note">
-              <Icon name="info" />
-              <p>{t.form.limitations}</p>
-            </div>
-          </Card>
-        </aside>
+            </Card>
+          </aside>
+        )}
       </div>
     </>
   );

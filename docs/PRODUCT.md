@@ -13,6 +13,16 @@ self lab is a personal laboratory for small experiments in everyday life. Its va
 
 A missed check-in is missing data, not a not-done day. Imported A/B observations with no completion information remain explicitly unclassified. Fictional samples are labelled and kept separate from the claim that these are the user's own measurements.
 
+## Question-first onboarding
+
+Dashboard shows “What would you like to understand about yourself?” when no experiment has `source: "user"`, including empty and sample-only workspaces. Existing user experiments bypass onboarding regardless of Active/Completed status. Sample exploration stays separate through a labelled secondary link when a sample is available.
+
+The same New Experiment form handles onboarding and subsequent creation. First enter a required question in an empty field, then Continue to an editable name, habit/change, built-in or custom metrics, and observation target. No metric is selected in a blank draft. The target explains that users can finish earlier or keep observing later. Back to question preserves unsaved fields; leaving the route resets the draft. Failed validation or writes preserve input.
+
+“Need an idea?” offers five small presets: Morning walks & mood, Coffee & sleep, Screen time & sleep, Exercise & energy, and Focus sessions & productivity. Clicking one fills a question, title, habit, relevant built-in metrics, and a 14-day target. Every field remains editable. Presets are inspiration, not scientific recommendations; no AI API interprets the question.
+
+Creation persists a user-owned Active experiment and navigates to Details with “Start observing today” and Check in. It never creates a check-in automatically. Onboarding needs no additional storage fields or migration.
+
 ## Experiment lifecycle
 
 Experiments have an explicit Active or Completed state. An elapsed target remains Active, with “Your observation window is complete”, recorded/target counts, “Finish & view results”, and “Keep observing”. Early finish is a secondary action and asks for confirmation with elapsed days, recorded observations, and Done / Not done counts. Finishing with sparse or no observations is allowed; results remain honest about insufficient data.

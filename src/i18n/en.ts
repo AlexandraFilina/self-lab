@@ -159,7 +159,7 @@ export const en = {
     habit: "Describe the habit",
     habitPlaceholder: "Take a 20-minute morning walk",
     duration: "Observation target",
-    durationHelp: "A target for observation. You decide when to finish or add more time.",
+    durationHelp: "You can finish earlier or keep observing later.",
     days: "days",
     addCustomMetric: "+ Add custom metric",
     customMetricName: "Metric name",
@@ -179,6 +179,52 @@ export const en = {
     tipTwo: "Record both done and not-done days. Missing check-ins are not treated as not done.",
     tipThree: "Use the same scoring approach and note relevant circumstances.",
     limitations: "These are personal observations, not evidence of cause and effect.",
+  },
+  onboarding: {
+    heading: "What would you like to understand about yourself?",
+    description:
+      "Start with a question about your routine, energy, mood, focus, sleep, or anything else you want to observe.",
+    continue: "Continue",
+    back: "Back to question",
+    habitPrompt: "What will you do or avoid?",
+    metricsPrompt: "What would help you notice a difference?",
+    ideasTitle: "Need an idea?",
+    ideasNotice:
+      "Ideas for inspiration, not scientific recommendations. You can change every field.",
+    sampleLink: "Explore a sample experiment",
+    startToday: "Start observing today",
+    ideas: {
+      morning_walk: {
+        label: "Morning walks & mood",
+        title: "Morning walks and mood",
+        question: "Do morning walks relate to better mood?",
+        habit: "Take a 20-minute morning walk",
+      },
+      coffee_sleep: {
+        label: "Coffee & sleep",
+        title: "Afternoon coffee and sleep",
+        question: "Does coffee after lunch affect how I sleep?",
+        habit: "Avoid coffee after lunch",
+      },
+      screen_sleep: {
+        label: "Screen time & sleep",
+        title: "Evening screen time and sleep",
+        question: "How does avoiding screens before bed relate to my sleep?",
+        habit: "Avoid screens in the hour before bed",
+      },
+      exercise_energy: {
+        label: "Exercise & energy",
+        title: "Exercise and energy",
+        question: "How do I rate my energy on days when I exercise?",
+        habit: "Do 20 minutes of exercise",
+      },
+      focus_sessions: {
+        label: "Focus sessions & productivity",
+        title: "Focus sessions and productivity",
+        question: "Do focused work sessions relate to my reported productivity?",
+        habit: "Do one 25-minute focused work session",
+      },
+    },
   },
   lifecycle: {
     windowComplete: "Your observation window is complete",

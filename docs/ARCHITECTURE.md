@@ -56,7 +56,15 @@ The provider hydrates after mounting, keeping server and first client render con
 
 ## Form lifecycle
 
-Next.js preserves inactive routes with React Activity. The creation form uses uncontrolled built-in fields and a stable callback-ref cleanup to reset both the native form and custom metric React state when its route is hidden, as well as after a successful creation. Cleanup resets React state directly because the native reset event alone is not reliable while Activity detaches event handling. Validation and storage errors do not detach that ref, so input survives a failed submission. Browser tests use visible elements to avoid interacting with an inactive preserved route.
+Next.js preserves inactive routes with React Activity. The creation form uses controlled question/title/habit/target/metric fields and a stable callback-ref cleanup to reset the native form and all React state when its route is hidden, as well as after a successful creation. Question/details steps preserve the same draft during Back/Continue; they do not remount the form ref. Cleanup resets React state directly because the native reset event alone is not reliable while Activity detaches event handling. Validation and storage errors do not detach that ref, so input survives a failed submission. Browser tests use visible elements to avoid interacting with an inactive preserved route.
+
+## Onboarding and ideas
+
+`needsOnboarding` checks explicit user origin, not sample presence, experiment count, title, or status. Dashboard renders `NewExperimentForm` in onboarding mode for empty/sample-only workspaces; `/experiments/new` uses the same component for existing users. No provider or route children are hidden during hydration.
+
+The first submit validates `experimentQuestionSchema`, also used by the full domain schema, and reveals the remaining fields without saving. Final submit reuses existing full validation, custom-metric actions, provider serialization, and repository persistence. `data/experiment-ideas.ts` defines five typed presets using dictionary copy and built-in metric IDs. `createIdeaDraft` creates an editable draft only on selection; `createEmptyExperimentDraft` contains no example text or selected metrics. Custom metrics use the unchanged experiment-local implementation.
+
+The same successful creation produces a user-owned Active experiment with an empty entries array. Existing Details check-in controls provide the next step. Storage stays version 5; onboarding state is derived, so no extra storage or migration is introduced.
 
 ## Native dialog lifecycle
 
