@@ -1,3 +1,4 @@
+import { builtInMetric } from "../src/features/experiments/model/metrics";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { AppError } from "../src/lib/errors";
@@ -33,7 +34,7 @@ const experiment = buildExperiment(
     question: "Does a walk relate to mood?",
     habit: "Walk for 20 minutes",
     durationDays: 14,
-    metrics: ["mood"],
+    metrics: [builtInMetric("mood")],
   },
   "experiment",
   TODAY,
@@ -121,7 +122,7 @@ test("corrupt or unsupported stored data are not overwritten", async () => {
   for (const raw of [
     "broken JSON",
     JSON.stringify({ version: 99, experiments: [] }),
-    JSON.stringify({ version: 2, experiments: [experiment, { ...experiment }] }),
+    JSON.stringify({ version: 4, experiments: [experiment, { ...experiment }] }),
   ]) {
     const storage = new MemoryStorage();
     storage.setItem(STORAGE_KEY, raw);
@@ -152,7 +153,7 @@ test("legacy snapshots migrate without losing scores, notes, conditions, or date
   const storage = new MemoryStorage();
   storage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, experiments: LEGACY_EXPERIMENTS }));
   const migrated = await createLocalStorageRepository(storage).load();
-  assert.equal(JSON.parse(storage.getItem(STORAGE_KEY) ?? "{}").version, 3);
+  assert.equal(JSON.parse(storage.getItem(STORAGE_KEY) ?? "{}").version, 4);
   assert.deepEqual(migrated?.[0].legacy, LEGACY_EXPERIMENTS[0]);
   assert.ok(migrated?.[0].entries.every((entry) => entry.habitStatus === null));
 });
@@ -184,7 +185,10 @@ test("version-two observations migrate to observedDate without inventing save ti
   };
   storage.setItem(
     STORAGE_KEY,
-    JSON.stringify({ version: 2, experiments: [{ ...experiment, entries: [previousEntry] }] }),
+    JSON.stringify({
+      version: 2,
+      experiments: [{ ...experiment, metrics: ["mood"], entries: [previousEntry] }],
+    }),
   );
   const repository = createLocalStorageRepository(storage);
   const migrated = await repository.load();
@@ -200,7 +204,7 @@ test("version-two observations migrate to observedDate without inventing save ti
     recordedAt: null,
     updatedAt: null,
   });
-  assert.equal(JSON.parse(storage.getItem(STORAGE_KEY) ?? "{}").version, 3);
+  assert.equal(JSON.parse(storage.getItem(STORAGE_KEY) ?? "{}").version, 4);
   assert.deepEqual(await createLocalStorageRepository(storage).load(), migrated);
   const edit = buildDailyEntry(
     migrated[0],

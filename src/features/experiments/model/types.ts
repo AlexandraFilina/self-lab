@@ -1,5 +1,26 @@
 export const METRIC_IDS = ["sleep", "mood", "productivity", "energy"] as const;
-export type MetricId = (typeof METRIC_IDS)[number];
+export type BuiltInMetricId = (typeof METRIC_IDS)[number];
+export type CustomMetricId = `custom_${string}`;
+export type MetricId = BuiltInMetricId | CustomMetricId;
+export interface NumericScale {
+  kind: "numeric";
+  min: number;
+  max: number;
+  step: number;
+}
+export const DEFAULT_NUMERIC_SCALE: NumericScale = { kind: "numeric", min: 1, max: 10, step: 1 };
+export type BuiltInMetricDefinition = {
+  id: BuiltInMetricId;
+  kind: "built_in";
+  scale: NumericScale;
+};
+export type CustomMetricDefinition = {
+  id: CustomMetricId;
+  label: string;
+  kind: "custom";
+  scale: NumericScale;
+};
+export type MetricDefinition = BuiltInMetricDefinition | CustomMetricDefinition;
 export type ExperimentStatus = "active" | "completed";
 export type HabitStatus = "done" | "not_done";
 export type MetricValues = Partial<Record<MetricId, number>>;
@@ -21,7 +42,7 @@ export interface Experiment {
   question: string;
   habit: string;
   durationDays: number;
-  metrics: MetricId[];
+  metrics: MetricDefinition[];
   startDate: string;
   entries: DailyEntry[];
   source: "user" | "sample";
@@ -39,7 +60,7 @@ export interface DailyEntryDraft {
 export interface LegacyDailyEntry {
   id: string;
   date: string;
-  values: MetricValues;
+  values: Partial<Record<BuiltInMetricId, number>>;
   note: string;
 }
 export interface LegacyExperiment {
@@ -50,7 +71,7 @@ export interface LegacyExperiment {
   conditionB: string;
   durationA: number;
   durationB: number;
-  metrics: MetricId[];
+  metrics: BuiltInMetricId[];
   startDate: string;
   entries: LegacyDailyEntry[];
 }

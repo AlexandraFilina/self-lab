@@ -1,7 +1,7 @@
 "use client";
 import { t } from "@/i18n";
-import { METRICS } from "../model/metrics";
-import type { MetricId } from "../model/types";
+import { metricLabel, metricDescription } from "../model/metrics";
+import type { MetricDefinition } from "../model/types";
 import { Button } from "@/components/ui";
 
 export function MetricSlider({
@@ -9,18 +9,23 @@ export function MetricSlider({
   value,
   onChange,
 }: {
-  metric: MetricId;
+  metric: MetricDefinition;
   value: number | undefined;
   onChange: (value: number | undefined) => void;
 }) {
-  const id = `score-${metric}`;
+  const id = `score-${metric.id}`;
+  const { min, max, step } = metric.scale;
+  const midpoint = min + Math.floor((max - min) / step / 2) * step;
+  const levels = metric.kind === "custom" ? t.checkIn.customLevels : t.checkIn.levels;
   const level =
-    value === undefined ? null : Math.max(0, Math.min(6, Math.round(((value - 1) / 9) * 6)));
-  const description = level === null ? t.checkIn.notRated : t.checkIn.levels[level];
+    value === undefined
+      ? null
+      : Math.max(0, Math.min(6, Math.round(((value - min) / (max - min)) * 6)));
+  const description = level === null ? t.checkIn.notRated : levels[level];
   return (
     <div className={`metric-slider ${value === undefined ? "metric-unrated" : ""}`}>
       <div className="section-heading">
-        <label htmlFor={id}>{METRICS[metric].label}</label>
+        <label htmlFor={id}>{metricLabel(metric)}</label>
         <output htmlFor={id} className="score-output">
           <svg
             viewBox="0 0 24 24"
@@ -34,49 +39,56 @@ export function MetricSlider({
             <circle cx="12" cy="12" r="9" />
             <path
               d={
-                level !== null && level >= 4
-                  ? "M7 13q5 6 10 0"
-                  : level !== null && level <= 1
-                    ? "M7 16q5-6 10 0"
-                    : "M7 15h10"
+                metric.kind === "custom"
+                  ? "M7 15h10"
+                  : level !== null && level >= 4
+                    ? "M7 13q5 6 10 0"
+                    : level !== null && level <= 1
+                      ? "M7 16q5-6 10 0"
+                      : "M7 15h10"
               }
             />
           </svg>
           <span>
             {description}
-            {value !== undefined && <> · {value}/10</>}
+            {value !== undefined && (
+              <>
+                {" "}
+                · {value}/{max}
+              </>
+            )}
           </span>
         </output>
       </div>
       <p id={`${id}-description`} className="muted">
-        {METRICS[metric].description}
+        {metricDescription(metric)}
       </p>
       <input
         id={id}
         type="range"
-        min={1}
-        max={10}
-        step={1}
-        value={value ?? 5}
+        min={min}
+        max={max}
+        step={step}
+        value={value ?? midpoint}
         onChange={(event) => onChange(Number(event.target.value))}
         onPointerDown={() => {
-          if (value === undefined) onChange(5);
+          if (value === undefined) onChange(midpoint);
         }}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
-            onChange(value ?? 5);
+            onChange(value ?? midpoint);
           }
         }}
         aria-describedby={`${id}-description`}
         aria-valuetext={
           value === undefined
-            ? t.checkIn.chooseScore(METRICS[metric].label)
-            : t.checkIn.scoreText(value, description)
+            ? t.checkIn.chooseScore(metricLabel(metric))
+            : t.checkIn.scoreText(value, description, max)
         }
       />
       <div className="metric-level-ticks" aria-hidden="true">
-        {t.checkIn.levels.map((label, index) => (
+        {levels.map((label, index) => (
           <i key={label} className={index === level ? "level-active" : ""} />
         ))}
       </div>
@@ -90,7 +102,7 @@ export function MetricSlider({
         >
           {t.checkIn.clear}
         </Button>
-        <span>{t.checkIn.scaleHigh}</span>
+        <span>{metric.kind === "custom" ? t.checkIn.scaleHighAmount : t.checkIn.scaleHigh}</span>
       </div>
     </div>
   );

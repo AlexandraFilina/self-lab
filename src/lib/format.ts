@@ -17,3 +17,11 @@ export function formatDate(
     new Date(`${date}T12:00:00Z`),
   );
 }
+
+export function formatRelativePercent(value: number, signed = true): string {
+  return new Intl.NumberFormat(APP_LOCALE, {
+    style: "percent",
+    maximumFractionDigits: 0,
+    signDisplay: signed ? "exceptZero" : "never",
+  }).format(value / 100);
+}

@@ -210,10 +210,10 @@ function EntryDialog({
           <div className="metric-sliders">
             {experiment.metrics.map((metric) => (
               <MetricSlider
-                key={metric}
+                key={metric.id}
                 metric={metric}
-                value={values[metric]}
-                onChange={(value) => setValues((current) => ({ ...current, [metric]: value }))}
+                value={values[metric.id]}
+                onChange={(value) => setValues((current) => ({ ...current, [metric.id]: value }))}
               />
             ))}
           </div>

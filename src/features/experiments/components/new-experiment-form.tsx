@@ -5,8 +5,9 @@ import { useCallback, useRef, useState, type FormEvent } from "react";
 import { t } from "@/i18n";
 import { errorMessage } from "@/lib/errors";
 import { EXPERIMENT_LIMITS, newExperimentSchema } from "../model/schemas";
-import { METRICS } from "../model/metrics";
-import { METRIC_IDS } from "../model/types";
+import { METRICS, builtInMetric, hasDuplicateMetric } from "../model/metrics";
+import { buildCustomMetric } from "../model/actions";
+import { METRIC_IDS, type CustomMetricDefinition } from "../model/types";
 import { useExperiments } from "../context/experiments-provider";
 import { Icon } from "@/components/icon";
 import { PageHeading } from "@/components/page-heading";
@@ -18,15 +19,57 @@ export function NewExperimentForm() {
   const formRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const attachForm = useCallback((form: HTMLFormElement | null) => {
-    formRef.current = form;
-    return () => {
-      form?.reset();
-    };
+  const [customMetrics, setCustomMetrics] = useState<CustomMetricDefinition[]>([]);
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customName, setCustomName] = useState("");
+  const [metricError, setMetricError] = useState("");
+  function selectedBuiltIns(form: HTMLFormElement) {
+    const selected = new FormData(form).getAll("metrics");
+    return METRIC_IDS.filter((id) => selected.includes(id)).map(builtInMetric);
+  }
+  function addCustomMetric() {
+    const form = formRef.current;
+    if (!form) return;
+    try {
+      const metric = buildCustomMetric(customName, crypto.randomUUID());
+      const next = [...customMetrics, metric];
+      if (hasDuplicateMetric([...selectedBuiltIns(form), ...next])) {
+        setMetricError(t.validation.duplicateMetric);
+        return;
+      }
+      setCustomMetrics(next);
+      setCustomName("");
+      setCustomOpen(false);
+      setMetricError("");
+      setError("");
+    } catch (cause) {
+      setMetricError(errorMessage(cause));
+    }
+  }
+  const reset = useCallback(() => {
+    setError("");
+    setCustomMetrics([]);
+    setCustomOpen(false);
+    setCustomName("");
+    setMetricError("");
   }, []);
+  const attachForm = useCallback(
+    (form: HTMLFormElement | null) => {
+      formRef.current = form;
+      return () => {
+        form?.reset();
+        reset();
+      };
+    },
+    [reset],
+  );
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (saving) return;
+    if (customOpen) {
+      setError(t.form.pendingCustomMetric);
+      return;
+    }
     const form = event.currentTarget;
     const data = new FormData(form);
     const result = newExperimentSchema.safeParse({
@@ -34,7 +77,7 @@ export function NewExperimentForm() {
       question: data.get("question"),
       habit: data.get("habit"),
       durationDays: Number(data.get("durationDays")),
-      metrics: data.getAll("metrics"),
+      metrics: [...selectedBuiltIns(form), ...customMetrics],
     });
     if (!result.success) {
       setError(result.error.issues[0].message);
@@ -63,7 +106,7 @@ export function NewExperimentForm() {
           ref={attachForm}
           noValidate
           onSubmit={submit}
-          onReset={() => setError("")}
+          onReset={reset}
           className="experiment-form"
         >
           <Card className="form-card">
@@ -153,19 +196,103 @@ export function NewExperimentForm() {
               <legend className="sr-only">{t.form.legend}</legend>
               {METRIC_IDS.map((metric) => (
                 <label key={metric} className="metric-option">
-                  <input
-                    type="checkbox"
-                    name="metrics"
-                    value={metric}
-                    defaultChecked={metric === "mood"}
-                  />
+                  <input type="checkbox" name="metrics" value={metric} />
                   <span>
                     <strong>{METRICS[metric].label}</strong>
                     <small>{METRICS[metric].description}</small>
                   </span>
                 </label>
               ))}
+              {customMetrics.map((metric) => (
+                <div
+                  key={metric.id}
+                  className="metric-option metric-option-selected custom-metric-option"
+                  data-custom-metric-id={metric.id}
+                >
+                  <span>
+                    <strong>{metric.label}</strong>
+                    <small>{t.form.customMetricHint}</small>
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={saving}
+                    aria-label={t.form.removeMetric(metric.label)}
+                    onClick={() => {
+                      setCustomMetrics((current) =>
+                        current.filter((item) => item.id !== metric.id),
+                      );
+                      setMetricError("");
+                      setError("");
+                    }}
+                  >
+                    <Icon name="close" />
+                  </Button>
+                </div>
+              ))}
             </fieldset>
+            <div className="custom-metric-editor">
+              {customOpen ? (
+                <>
+                  <label htmlFor="custom-metric-name" className="field-label">
+                    {t.form.customMetricName}
+                  </label>
+                  <Input
+                    id="custom-metric-name"
+                    name="customMetricName"
+                    value={customName}
+                    autoFocus
+                    required
+                    maxLength={EXPERIMENT_LIMITS.customMetricLabel}
+                    placeholder={t.form.customMetricPlaceholder}
+                    disabled={saving}
+                    onChange={(event) => setCustomName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        addCustomMetric();
+                      }
+                    }}
+                  />
+                  <div className="custom-metric-actions">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={saving}
+                      onClick={addCustomMetric}
+                    >
+                      {t.form.addMetric}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={saving}
+                      onClick={() => {
+                        setCustomOpen(false);
+                        setCustomName("");
+                        setMetricError("");
+                      }}
+                    >
+                      {t.common.cancel}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={saving}
+                  onClick={() => setCustomOpen(true)}
+                >
+                  {t.form.addCustomMetric}
+                </Button>
+              )}
+              {metricError && (
+                <p className="form-error" role="alert">
+                  {metricError}
+                </p>
+              )}
+            </div>
           </Card>
           {error && (
             <p className="form-error" role="alert">

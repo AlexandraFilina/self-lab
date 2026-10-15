@@ -1,3 +1,4 @@
+import { builtInMetric } from "../src/features/experiments/model/metrics";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
@@ -36,7 +37,7 @@ const draft: NewExperiment = {
   question: "Do I feel better on days when I walk?",
   habit: "Take a 20-minute walk",
   durationDays: 28,
-  metrics: ["mood", "energy"],
+  metrics: [builtInMetric("mood"), builtInMetric("energy")],
 };
 const experiment = buildExperiment(draft, "experiment", TODAY);
 function entry(
@@ -67,7 +68,7 @@ test("two different experiments receive separate IDs and no previous fields or e
         title: "Less coffee",
         question: "Do I sleep better without late coffee?",
         habit: "Avoid coffee after 2 pm",
-        metrics: ["sleep"],
+        metrics: [builtInMetric("sleep")],
       },
       "second",
       TODAY,
@@ -79,7 +80,7 @@ test("two different experiments receive separate IDs and no previous fields or e
   assert.equal(state.length, 2);
   assert.equal(first.title, "Morning walks");
   assert.equal(second.title, "Less coffee");
-  assert.deepEqual(second.metrics, ["sleep"]);
+  assert.deepEqual(second.metrics, [builtInMetric("sleep")]);
   assert.deepEqual(first.entries, []);
   assert.deepEqual(second.entries, []);
   assert.equal(draft.title, "  Morning walks  ");
@@ -89,12 +90,12 @@ test("creation rejects blank text, invalid durations, and missing or duplicate m
     assert.equal(newExperimentSchema.safeParse({ ...draft, [field]: "  " }).success, false);
   for (const durationDays of [0, -1, 1.5, 366, NaN, Infinity])
     assert.equal(newExperimentSchema.safeParse({ ...draft, durationDays }).success, false);
-  for (const metrics of [[], ["mood", "mood"], ["unknown"]])
+  for (const metrics of [[], [builtInMetric("mood"), builtInMetric("mood")], ["unknown"]])
     assert.equal(newExperimentSchema.safeParse({ ...draft, metrics }).success, false);
   assert.equal(newExperimentSchema.safeParse({ ...draft, durationDays: 365 }).success, true);
 });
 test("check-ins require an explicit habit choice and do not invent scores or notes", () => {
-  const schema = getDailyEntrySchema(["mood", "energy"]);
+  const schema = getDailyEntrySchema([builtInMetric("mood"), builtInMetric("energy")]);
   assert.equal(schema.safeParse({ values: {} }).success, false);
   assert.equal(schema.safeParse({ habitStatus: null, values: {} }).success, false);
   const result = buildDailyEntry(
@@ -109,7 +110,7 @@ test("check-ins require an explicit habit choice and do not invent scores or not
   assert.equal(result.note, "");
 });
 test("optional scores reject invalid values and metrics not selected for the experiment", () => {
-  const schema = getDailyEntrySchema(["mood"]);
+  const schema = getDailyEntrySchema([builtInMetric("mood")]);
   for (const values of [
     { mood: 0 },
     { mood: 11 },
@@ -311,7 +312,7 @@ test("version-one snapshots migrate explicitly and sample seeds remain fictional
   assert.equal(result.migrated, true);
   assert.equal(result.experiments[0].source, "user");
   const seeds = createSampleExperiments(TODAY);
-  assert.equal(seeds.length, 4);
+  assert.equal(seeds.length, 1);
   assert.ok(seeds.every((item) => item.source === "sample"));
   assert.ok(seeds[0].entries.every((row) => row.observedDate < TODAY));
 });

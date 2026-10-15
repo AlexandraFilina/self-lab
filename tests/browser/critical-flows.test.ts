@@ -4,7 +4,12 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Experiment } from "../../src/features/experiments/model/types";
+import { buildExperiment } from "../../src/features/experiments/model/actions";
+import { builtInMetric } from "../../src/features/experiments/model/metrics";
+import { adaptLegacyExperiment } from "../../src/features/experiments/data/migration";
+import { LEGACY_EXPERIMENTS } from "../../src/features/experiments/data/legacy-experiments";
+import { addDays } from "../../src/lib/dates";
+import type { Experiment, CustomMetricId } from "../../src/features/experiments/model/types";
 
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 async function retry<T>(read: () => Promise<T> | T, timeout = 20000): Promise<T> {
@@ -100,7 +105,7 @@ class Browser {
   }
   async click(text: string, selector = "button") {
     const point = await this.evaluate<{ x: number; y: number }>(
-      `(()=>{const element=globalThis.__qa(${JSON.stringify(selector)}).find(el=>el.textContent.replace(/\\s+/g,' ').trim()===${JSON.stringify(text)});if(!element)throw Error('Missing target: '+${JSON.stringify(text)});if(element.disabled)throw Error('Disabled target: '+${JSON.stringify(text)});element.scrollIntoView({block:'center'});const r=element.getBoundingClientRect();const x=r.x+r.width/2,y=r.y+r.height/2;if(!element.contains(document.elementFromPoint(x,y)))throw Error('Obscured target: '+${JSON.stringify(text)});return {x,y}})()`,
+      `(()=>{const element=globalThis.__qa(${JSON.stringify(selector)}).find(el=>el.textContent.replace(/\\s+/g,' ').trim()===${JSON.stringify(text)});if(!element)throw Error('Missing target: '+${JSON.stringify(text)});if(element.disabled)throw Error('Disabled target: '+${JSON.stringify(text)});element.scrollIntoView({block:'center'});for(const r of element.getClientRects()){const x=r.x+r.width/2,y=r.y+r.height/2;if(r.width>0&&r.height>0&&element.contains(document.elementFromPoint(x,y)))return {x,y}}throw Error('Obscured target: '+${JSON.stringify(text)})})()`,
     );
     await this.send("Input.dispatchMouseEvent", { type: "mouseMoved", ...point });
     await this.send("Input.dispatchMouseEvent", {
@@ -152,7 +157,7 @@ class Browser {
 }
 
 test(
-  "critical browser flows: fresh forms, storage failures, reload, check-in edits, local dates, and responsive UI",
+  "critical browser flows: check-ins, custom metrics, completed results, reload, and responsive UI",
   { timeout: 120000 },
   async () => {
     const executable = [
@@ -273,11 +278,37 @@ test(
         "(()=>{const d=new Date();d.setDate(d.getDate()-1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`})()",
       );
       const initial = await workspace();
-      const seed = initial.experiments.find((item) => item.id === "morning-walk-daily");
-      assert.ok(seed);
-      seed.entries = seed.entries.filter((entry) => entry.observedDate !== yesterdayDate);
+      assert.deepEqual(
+        initial.experiments.map((item) => item.id),
+        ["morning-walk-completed"],
+      );
+      initial.experiments.push(...LEGACY_EXPERIMENTS.map((item) => adaptLegacyExperiment(item)));
       await page.evaluate(
         `localStorage.setItem('self-lab:experiments',${JSON.stringify(JSON.stringify(initial))})`,
+      );
+      await navigate("/dashboard", "Hello, curious mind");
+      assert.deepEqual(
+        (await workspace()).experiments.map((item) => item.id),
+        ["morning-walk-completed"],
+      );
+      await navigate("/experiments", "My experiments");
+      assert.equal(await page.evaluate("globalThis.__qa('.experiment-card').length"), 1);
+      await navigate("/experiments/morning-walk", "Experiment not found");
+      const seed = buildExperiment(
+        {
+          title: "Browser check-in experiment",
+          question: "How do walks relate to mood?",
+          habit: "Take a short walk",
+          durationDays: 28,
+          metrics: [builtInMetric("mood"), builtInMetric("energy")],
+        },
+        "browser-active",
+        addDays(yesterdayDate, -13),
+      );
+      const withActive = await workspace();
+      withActive.experiments.unshift(seed);
+      await page.evaluate(
+        `localStorage.setItem('self-lab:experiments',${JSON.stringify(JSON.stringify(withActive))})`,
       );
       await navigate("/dashboard", "Hello, curious mind");
       for (const label of ["Check in", "Check in today"]) {
@@ -295,7 +326,7 @@ test(
         await page.evaluate("globalThis.__q('button[aria-pressed=true]').textContent"),
         "Yesterday",
       );
-      const sampleId = "morning-walk-daily";
+      const sampleId = "browser-active";
       const previousSample = await userExperiment(sampleId);
       await page.evaluate("globalThis.__q('input[name=habitStatus][value=not_done]').click()");
       await page.score("mood", 4);
@@ -342,6 +373,12 @@ test(
       await page.fill("#experiment-title", "First browser experiment");
       await page.fill("#experiment-question", "Do walks relate to my mood?");
       await page.fill("#experiment-habit", "Walk for 20 minutes");
+      assert.equal(await page.evaluate("globalThis.__qa('input[name=metrics]:checked').length"), 0);
+      await page.click("Create experiment");
+      await page.wait(
+        "globalThis.__q('form [role=alert]')?.textContent==='Choose at least one metric to track.'",
+      );
+      await page.evaluate("globalThis.__q('input[name=metrics][value=mood]').click()");
       await page.click("Create experiment");
       await page.wait("globalThis.__q('h1')?.textContent==='First browser experiment'");
       const firstId = (await page.evaluate<string>("location.pathname")).split("/").at(-1);
@@ -359,11 +396,43 @@ test(
       assert.equal(await page.evaluate("globalThis.__q('#experiment-question').value"), "");
       assert.equal(await page.evaluate("globalThis.__q('#experiment-habit').value"), "");
       assert.equal(await page.evaluate("globalThis.__q('#duration-days').value"), "14");
-      assert.equal(await page.evaluate("globalThis.__qa('input[name=metrics]:checked').length"), 1);
+      assert.equal(await page.evaluate("globalThis.__qa('input[name=metrics]:checked').length"), 0);
       await page.fill("#experiment-title", "Second browser experiment");
       await page.fill("#experiment-question", "How does this habit relate to energy?");
       await page.fill("#experiment-habit", "Take a short walk");
       await page.evaluate("globalThis.__q('input[name=metrics][value=energy]').click()");
+      await page.evaluate("globalThis.__q('input[name=metrics][value=mood]').click()");
+      await page.click("+ Add custom metric");
+      await page.click("Add metric");
+      await page.wait(
+        "globalThis.__q('.custom-metric-editor [role=alert]')?.textContent.includes('Enter a name')",
+      );
+      await page.fill("#custom-metric-name", "  Focus  ");
+      await page.click("Add metric");
+      await page.wait("!!globalThis.__q('[data-custom-metric-id]')");
+      const focusId = await page.evaluate<CustomMetricId>(
+        "globalThis.__q('[data-custom-metric-id]').dataset.customMetricId",
+      );
+      assert.match(focusId, /^custom_[a-f0-9-]+$/);
+      await page.click("+ Add custom metric");
+      await page.fill("#custom-metric-name", " fOcUs ");
+      await page.click("Add metric");
+      await page.wait(
+        "globalThis.__q('.custom-metric-editor [role=alert]')?.textContent.includes('already selected')",
+      );
+      assert.equal(await page.evaluate("globalThis.__qa('[data-custom-metric-id]').length"), 1);
+      await page.click("Cancel", ".custom-metric-editor button");
+      await page.click("+ Add custom metric");
+      await page.fill("#custom-metric-name", "Temporary");
+      await page.click("Add metric");
+      await page.wait("globalThis.__qa('[data-custom-metric-id]').length===2");
+      await page.click("", "button[aria-label='Remove Temporary']");
+      assert.equal(await page.evaluate("globalThis.__qa('[data-custom-metric-id]').length"), 1);
+      await page.click("+ Add custom metric");
+      await page.fill("#custom-metric-name", "X".repeat(40));
+      await page.click("Add metric");
+      await page.screenshot(join(profile, "custom-metric-form.png"));
+
       await page.evaluate(
         "globalThis.__originalSetItem=Storage.prototype.setItem;Storage.prototype.setItem=function(){throw new DOMException('Quota exceeded','QuotaExceededError')}",
       );
@@ -377,7 +446,11 @@ test(
       );
       assert.equal(
         (await workspace()).experiments.filter((item) => item.source === "user").length,
-        1,
+        2,
+      );
+      assert.equal(
+        await page.evaluate("globalThis.__q('[data-custom-metric-id]').dataset.customMetricId"),
+        focusId,
       );
       await page.evaluate("Storage.prototype.setItem=globalThis.__originalSetItem");
       await page.click("Create experiment");
@@ -387,10 +460,19 @@ test(
       assert.notEqual(firstId, secondId);
       assert.equal(
         (await workspace()).experiments.filter((item) => item.source === "user").length,
-        2,
+        3,
+      );
+      assert.ok(
+        (await userExperiment(secondId)).metrics.some(
+          (metric) => metric.id === focusId && metric.kind === "custom" && metric.label === "Focus",
+        ),
       );
       await page.click("Check in today");
       await page.dialogOpen();
+      assert.equal(
+        await page.evaluate(`globalThis.__q('label[for="score-${focusId}"]').textContent`),
+        "Focus",
+      );
       assert.equal(
         await page.evaluate(
           "globalThis.__qa('dialog button').find(e=>e.textContent==='Yesterday').disabled",
@@ -413,6 +495,7 @@ test(
       assert.equal((await userExperiment(secondId)).entries.length, 0);
       await page.evaluate("globalThis.__q('input[name=habitStatus][value=done]').click()");
       await page.score("mood", 6);
+      await page.score(focusId, 7);
       await page.fill("#entry-note", "A day worth remembering");
       await page.evaluate(
         "globalThis.__OriginalDate=Date;globalThis.Date=class extends globalThis.__OriginalDate{constructor(...args){super(...(args.length?args:[globalThis.__OriginalDate.now()+86400000]))}};window.dispatchEvent(new Event('focus'))",
@@ -426,6 +509,16 @@ test(
       assert.equal(saved.entries[0].habitStatus, "done");
       assert.equal(saved.entries[0].values.mood, 6);
       assert.equal(saved.entries[0].values.energy, undefined);
+      assert.equal(saved.entries[0].values[focusId], 7);
+      assert.equal(await page.evaluate("globalThis.__qa('.metric-chart path').length"), 0);
+      assert.ok(
+        await page.evaluate(
+          "globalThis.__q('.chart-container').textContent.includes('1 observation recorded. Add more check-ins to see a trend.')",
+        ),
+      );
+      assert.ok(
+        await page.evaluate("globalThis.__q('.entries-table').textContent.includes('Focus')"),
+      );
       assert.equal(saved.entries[0].observedDate, expectedLocal);
       assert.ok(saved.entries[0].recordedAt);
       assert.equal(saved.entries[0].updatedAt, null);
@@ -472,7 +565,14 @@ test(
           "globalThis.__q('.entries-table').textContent.includes('Kept after a failed save')",
         ),
       );
+      assert.equal((await userExperiment(secondId)).entries[0].values[focusId], 7);
+      assert.ok((await userExperiment(secondId)).metrics.some((metric) => metric.id === focusId));
       assert.equal((await userExperiment(secondId)).entries.length, 1);
+      await page.click("Edit check-in");
+      await page.dialogOpen();
+      assert.ok(await page.evaluate(`globalThis.__q('#score-${focusId}').value==='7'`));
+      await page.click("Cancel");
+      await page.wait("!globalThis.__q('dialog')");
       await navigate(`/experiments/${firstId}`, "First browser experiment");
       assert.equal((await userExperiment(firstId)).entries.length, 0);
       assert.ok(
@@ -487,12 +587,124 @@ test(
         ),
       );
       await navigate("/experiments/new", "Start with curiosity");
+      assert.equal(await page.evaluate("globalThis.__qa('input[name=metrics]:checked').length"), 0);
+      assert.equal(await page.evaluate("globalThis.__qa('[data-custom-metric-id]').length"), 0);
       await page.fill("#experiment-title", "An abandoned draft");
+      await page.click("+ Add custom metric");
+      await page.fill("#custom-metric-name", "Abandoned metric");
+      await page.click("Add metric");
+
       await page.click("Experiments", ".nav-link");
       await page.wait("!!globalThis.__q('.filter-tabs')");
       await page.click("New experiment", "a");
       await page.wait("!!globalThis.__q('#experiment-title')");
       assert.equal(await page.evaluate("globalThis.__q('#experiment-title').value"), "");
+      assert.equal(await page.evaluate("globalThis.__qa('[data-custom-metric-id]').length"), 0);
+      assert.equal(await page.evaluate("globalThis.__qa('input[name=metrics]:checked').length"), 0);
+
+      const completedId = "morning-walk-completed";
+      const completedTitle = "Morning walks, mood, and productivity";
+      await navigate("/experiments", "My experiments");
+      const completedFilter = await page.evaluate<string>(
+        "globalThis.__qa('.filter-tab').find(e=>e.textContent.startsWith('Completed')).textContent",
+      );
+      await page.click(completedFilter, ".filter-tab");
+      await page.wait("globalThis.__q('.filter-selected')?.textContent.startsWith('Completed')");
+      assert.equal(
+        await page.evaluate("globalThis.__q('.experiment-card h2 a').textContent"),
+        completedTitle,
+      );
+      await page.click(completedTitle, ".experiment-card h2 a");
+      await page.wait(`globalThis.__q('h1')?.textContent===${JSON.stringify(completedTitle)}`);
+      for (let reload = 0; reload < 2; reload++) {
+        if (reload) await navigate(`/experiments/${completedId}`, completedTitle);
+        assert.equal(await page.evaluate("globalThis.__qa('.metric-result').length"), 2);
+        assert.equal(
+          await page.evaluate(
+            "globalThis.__q('[data-metric-id=mood] .result-percentage').textContent",
+          ),
+          "+24%",
+        );
+        assert.equal(
+          await page.evaluate(
+            "globalThis.__q('[data-metric-id=productivity] .result-message').textContent",
+          ),
+          "No clear difference",
+        );
+        assert.ok(
+          await page.evaluate(
+            "globalThis.__qa('.data-strength').every(e=>e.textContent==='Early pattern')",
+          ),
+        );
+        assert.ok(
+          await page.evaluate(
+            "globalThis.__q('.comparison-card').textContent.includes('13 done days · 8 not-done days')",
+          ),
+        );
+        assert.ok(
+          await page.evaluate(
+            "globalThis.__q('.insight-note').textContent.includes('not proof that the habit caused the difference')",
+          ),
+        );
+        assert.equal(await page.evaluate("globalThis.__q('.observations-disclosure').open"), false);
+        assert.equal(await page.evaluate("globalThis.__qa('.entries-table tbody tr').length"), 0);
+        assert.equal(await page.evaluate("globalThis.__qa('.legacy-disclosure').length"), 0);
+      }
+      await page.evaluate("globalThis.__q('.comparison-card').scrollIntoView({block:'start'})");
+      await page.screenshot(join(profile, "completed-results-desktop.png"));
+      assert.ok(
+        await page.evaluate("globalThis.__qa('.metric-chart path[data-segment=dashed]').length>0"),
+      );
+      assert.ok(
+        await page.evaluate(
+          "globalThis.__q('.chart-container').textContent.includes('Dashed segments cross days with no recorded score.')",
+        ),
+      );
+      await page.click("How was this calculated?", "summary");
+      for (const text of [
+        "7 days without a check-in",
+        "7.3 / 10",
+        "5.9 / 10",
+        "not statistical confidence",
+      ])
+        assert.ok(
+          await page.evaluate(
+            `globalThis.__q('.calculation-details').textContent.includes(${JSON.stringify(text)})`,
+          ),
+          text,
+        );
+      await page.click("View 21 daily observations", "summary");
+      assert.equal(await page.evaluate("globalThis.__qa('.entries-table tbody tr').length"), 21);
+      const completedBefore = await userExperiment(completedId);
+      const editedDate = await page.evaluate<string>(
+        "globalThis.__q('.entries-table tbody time').dateTime",
+      );
+      const originalEntry = completedBefore.entries.find(
+        (entry) => entry.observedDate === editedDate,
+      );
+      assert.ok(originalEntry);
+      await page.click("Edit", ".entries-table tbody tr:first-child button");
+      await page.dialogOpen();
+      await page.fill("#entry-note", "Completed observation edited without duplication");
+      await page.click("Save check-in");
+      await page.wait("!globalThis.__q('dialog')");
+      await navigate(`/experiments/${completedId}`, completedTitle);
+      const completedAfter = await userExperiment(completedId);
+      assert.equal(completedAfter.entries.length, 21);
+      const completedEdit = completedAfter.entries.find(
+        (entry) => entry.observedDate === editedDate,
+      );
+      assert.equal(completedEdit?.id, originalEntry.id);
+      assert.equal(completedEdit?.note, "Completed observation edited without duplication");
+      assert.ok(completedEdit?.updatedAt);
+      assert.equal(await page.evaluate("globalThis.__q('.observations-disclosure').open"), false);
+      assert.equal(
+        await page.evaluate(
+          "globalThis.__q('[data-metric-id=mood] .result-percentage').textContent",
+        ),
+        "+24%",
+      );
+
       await page.send("Emulation.setDeviceMetricsOverride", {
         width: 390,
         height: 844,
@@ -503,6 +715,7 @@ test(
         ["/dashboard", "Hello, curious mind"],
         ["/experiments", "My experiments"],
         ["/experiments/new", "Start with curiosity"],
+        [`/experiments/${completedId}`, completedTitle],
         [`/experiments/${secondId}`, "Second browser experiment"],
       ]) {
         await navigate(route, heading);
@@ -511,10 +724,24 @@ test(
           `Mobile overflow: ${route}`,
         );
         assert.equal(await page.evaluate("/[А-Яа-яЁё]/.test(document.body.textContent)"), false);
+        if (route === `/experiments/${completedId}`) {
+          assert.equal(
+            await page.evaluate("globalThis.__q('.observations-disclosure').open"),
+            false,
+          );
+          await page.evaluate("globalThis.__q('.comparison-card').scrollIntoView({block:'start'})");
+          await page.screenshot(join(profile, "completed-results-mobile.png"));
+        }
       }
       await page.screenshot(join(profile, "details-mobile.png"));
       await page.click("Edit check-in");
       await page.dialogOpen();
+      assert.ok(
+        await page.evaluate(
+          "globalThis.__q('dialog').scrollWidth<=globalThis.__q('dialog').clientWidth",
+        ),
+        "Long custom metric labels must fit the mobile dialog",
+      );
       await page.screenshot(join(profile, "check-in-mobile.png"));
       await page.key("Escape", 27);
       await page.wait("!globalThis.__q('dialog')");

@@ -7,7 +7,7 @@ import Link from "next/link";
 import type { Experiment } from "@/features/experiments/model/types";
 import { formatCount, formatDate } from "@/lib/format";
 import { endDate, getProgress } from "@/features/experiments/model/analytics";
-import { METRICS } from "@/features/experiments/model/metrics";
+import { metricLabel, metricColor } from "@/features/experiments/model/metrics";
 import { Card } from "@/components/ui";
 import { Icon } from "@/components/icon";
 
@@ -78,9 +78,9 @@ export function ExperimentCard({ experiment }: { experiment: Experiment }) {
       <p className="experiment-hypothesis">{experiment.question}</p>
       <div className="metric-tags">
         {experiment.metrics.map((metric) => (
-          <span key={metric}>
-            <i style={{ backgroundColor: METRICS[metric].color }} />
-            {METRICS[metric].label}
+          <span key={metric.id}>
+            <i style={{ backgroundColor: metricColor(metric) }} />
+            {metricLabel(metric)}
           </span>
         ))}
       </div>

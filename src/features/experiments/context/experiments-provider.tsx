@@ -14,7 +14,7 @@ import { AppError, errorMessage } from "@/lib/errors";
 import { localDate } from "@/lib/dates";
 import { buildDailyEntry, buildExperiment, experimentsReducer } from "../model/actions";
 import { createLocalStorageRepository } from "../data/local-storage-repository";
-import { createSampleExperiments } from "../data/mock-experiments";
+import { createSampleExperiments, ensureCompletedSample } from "../data/mock-experiments";
 import type { ExperimentsRepository } from "../data/repository";
 import type { DailyEntryDraft, Experiment, NewExperiment } from "../model/types";
 
@@ -53,8 +53,9 @@ export function ExperimentsProvider({ children }: { children: ReactNode }) {
         const saved = await adapter.load();
         if (cancelled) return;
         const today = localDate();
-        const loaded = saved ?? createSampleExperiments(today);
-        if (saved === null) await adapter.save(loaded);
+        const loaded =
+          saved === null ? createSampleExperiments(today) : ensureCompletedSample(saved, today);
+        if (saved === null || loaded !== saved) await adapter.save(loaded);
         if (cancelled) return;
         repository.current = adapter;
         current.current = loaded;

@@ -124,18 +124,23 @@ export const en = {
     status: "Habit status",
     actions: "Actions",
     legacy: "Imported A/B observations",
+    legacyDetails: "Legacy experiment details",
+    viewObservations: (count: number) =>
+      `View ${count} daily ${count === 1 ? "observation" : "observations"}`,
     legacyText:
       "These original scores are preserved. Habit completion was not recorded, so they are excluded from done/not-done comparisons.",
     original: "Original A/B conditions",
     usual: "Period A",
     changed: "Period B",
     chartEmpty: "A fresh start",
+    singleObservation: "1 observation recorded. Add more check-ins to see a trend.",
     chartEmptyText: "Add your first check-in to see how your scores change over time.",
     chartLabel:
       "Daily scores on a scale of 1 to 10. Exact values are available in the daily check-ins table.",
+    chartGaps: "Dashed segments cross days with no recorded score.",
     chartDays: "Experiment days",
-    pointTitle: (label: string, value: number, day: number) =>
-      `${label}: ${value} / 10 · day ${day}`,
+    pointTitle: (label: string, value: number, day: number, max: number) =>
+      `${label}: ${value} / ${max} · day ${day}`,
     sampleNotice: "Fictional sample observations; not your measurements.",
   },
   form: {
@@ -155,6 +160,13 @@ export const en = {
     duration: "Observation window",
     durationHelp: "You can record Done or Not done on any day in this window.",
     days: "days",
+    addCustomMetric: "+ Add custom metric",
+    customMetricName: "Metric name",
+    customMetricPlaceholder: "For example: Focus or Stress",
+    addMetric: "Add metric",
+    removeMetric: (label: string) => `Remove ${label}`,
+    customMetricHint: "Only for this experiment · numeric scale from 1 to 10",
+    pendingCustomMetric: "Add this custom metric or cancel it before creating the experiment.",
     metricsTitle: "What will you track?",
     metricsHelp: "Choose at least one metric. Daily scores are optional and stay on a 1–10 scale.",
     legend: "Experiment metrics",
@@ -189,22 +201,33 @@ export const en = {
     local: "Saved only in this browser. No account or cross-device sync.",
     notRated: "Not rated",
     clear: "Clear score",
+    customLevels: [
+      "Very low",
+      "Low",
+      "Somewhat low",
+      "Moderate",
+      "Somewhat high",
+      "High",
+      "Very high",
+    ],
+    scaleHighAmount: "High",
     scaleLow: "Low",
     scaleHigh: "Great",
     levels: ["Very low", "Low", "Below okay", "Okay", "Good", "Very good", "Great"],
-    scoreText: (value: number, label: string) => `${label}, ${value} out of 10`,
+    scoreText: (value: number, label: string, max: number) => `${label}, ${value} out of ${max}`,
     chooseScore: (label: string) => `Choose a score for ${label}`,
     legacyStatus: "Completion was not recorded for this imported observation.",
   },
   metrics: {
+    customDescription: (label: string) => `How would you rate ${label} today?`,
     sleep: { label: "Sleep quality", description: "How well did you sleep?" },
     mood: { label: "Mood", description: "How did you feel today?" },
     productivity: { label: "Productivity", description: "How productive was your day?" },
     energy: { label: "Energy", description: "How much energy did you have today?" },
   },
   analytics: {
-    title: "What the observations show",
-    description: "Done and not-done days · scores from 1 to 10",
+    title: "What you observed",
+    description: "Compare your average reported scores on done and not-done days.",
     preliminary: "Descriptive comparison",
     insufficient: "Not enough observations to compare yet.",
     requirement: (minimum: number) =>
@@ -217,14 +240,51 @@ export const en = {
     calculation: "How was this calculated?",
     caption: "Comparison of scored observations by habit completion",
     metric: "Metric",
-    difference: "Difference · Done − Not done",
+    difference: "Relative difference",
+    noClearDifference: "No clear difference",
+    relativeUnavailable: "Relative difference unavailable",
+    direction: {
+      insufficient: "Too early to compare",
+      higher: "Higher on done days",
+      lower: "Lower on done days",
+      slightly_higher: "Slightly higher on done days",
+      slightly_lower: "Slightly lower on done days",
+      similar: "No clear difference",
+    },
+    strength: {
+      too_early: "Too early to compare",
+      early_pattern: "Early pattern",
+      worth_noticing: "Pattern worth noticing",
+    },
+    metricCounts: (done: number, notDone: number) =>
+      `${done} done ${done === 1 ? "day" : "days"} · ${notDone} not-done ${notDone === 1 ? "day" : "days"}`,
+    missingScores: (count: number) => `${count} missing ${count === 1 ? "score" : "scores"}`,
+    missingDays: (count: number) =>
+      `${count} ${count === 1 ? "day" : "days"} without a check-in; these are not not-done days.`,
+    excluded: (count: number) =>
+      `${count} unclassified ${count === 1 ? "observation excluded" : "observations excluded"} because habit completion was not recorded.`,
+    relativeSummary: (metric: string, amount: string, direction: "higher" | "lower") =>
+      `Average reported ${metric} score was ${amount} ${direction} on done days.`,
+    noPercentYet: "Not shown until both groups have at least 5 scored observations.",
+    invalidDenominator:
+      "A relative difference needs a positive not-done average and finite averages.",
+    strengthHelp:
+      "Data labels use the smaller scored group: fewer than 5 = Too early to compare; 5–9 = Early pattern; 10 or more = Pattern worth noticing. These labels describe observation counts, not statistical confidence.",
+    causalLimit:
+      "This is a pattern in your observations, not proof that the habit caused the difference.",
+    endings: {
+      pattern: "You collected enough observations to notice a pattern in your routine.",
+      similar:
+        "Not finding a clear difference is useful too. This habit may matter less than you expected, or you may need more observations.",
+      insufficient: "More scored observations in both groups would be needed to make a comparison.",
+    },
     noData: "No scored observations",
     groupCounts: (done: number, notDone: number, unclassified: number) =>
       `${done} done days · ${notDone} not-done days · ${unclassified} unclassified observations`,
     missing:
       "Missing check-ins and imported observations with no recorded habit status are not placed in either group. Missing scores are excluded separately for each metric.",
     method:
-      "For each group, add the recorded scores and divide by the number of scored observations. The difference is the done average minus the not-done average, in scale points. Values within half a point are described as similar. Displayed averages and differences are rounded to one decimal.",
+      "For each metric and group, add the recorded scores and divide by the number of scored observations. Subtract the not-done average from the done average, divide by the not-done average, and multiply by 100. Percentages use unrounded averages and round to whole percentages; displayed averages round to one decimal. Differences within half a scale point are described as no clear difference. A directional relative difference below 10% is described as slightly higher or lower. A relative difference on a subjective scale is not a percentage improvement in wellbeing.",
     limits:
       "Subjective scores are approximate. Small or unbalanced samples, self-reporting, workload, weekends, and other circumstances limit interpretation. These observations do not establish causation or statistical significance.",
   },
@@ -259,8 +319,10 @@ export const en = {
     required: (label: string) => `${label} is required.`,
     length: (label: string, max: number) => `${label} must be ${max} characters or fewer.`,
     duration: "Choose a whole number of days between 1 and 365.",
-    metric: "Choose at least one metric.",
-    duplicateMetric: "Choose each metric only once.",
+    metric: "Choose at least one metric to track.",
+    customMetricName: "Enter a name for the custom metric.",
+    customMetricLength: (max: number) => `Metric names must be ${max} characters or fewer.`,
+    duplicateMetric: "A metric with this name is already selected.",
     score: "Scores must be whole numbers from 1 to 10.",
     unselectedMetric: "Only score metrics selected for this experiment.",
     note: "Notes must be 500 characters or fewer.",
@@ -271,6 +333,9 @@ export const en = {
     imported: "Only imported observations may have an unrecorded habit status.",
   },
   samples: {
+    completedTitle: "Morning walks, mood, and productivity",
+    completedQuestion: "Do I tend to feel better on days when I take a morning walk?",
+    completedNote: "Fictional sample: a busy workday after a short walk.",
     title: "Morning walks and mood",
     question: "Do I feel better on days when I take a morning walk?",
     habit: "Take a 20-minute morning walk",

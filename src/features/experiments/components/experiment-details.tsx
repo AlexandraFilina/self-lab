@@ -3,14 +3,14 @@ import Link from "next/link";
 import { t } from "@/i18n";
 import { formatCount, formatDate } from "@/lib/format";
 import { endDate, getProgress } from "../model/analytics";
-import { METRICS } from "../model/metrics";
 import { useExperiments } from "../context/experiments-provider";
 import { DailyEntryButton } from "./daily-entry";
 import { ExperimentProgress, StatusBadge } from "./experiment-card";
 import { Icon } from "@/components/icon";
 import { MetricChart } from "./metric-chart";
 import { ResultsComparison } from "./results-comparison";
-import { Card, cn } from "@/components/ui";
+import { DailyObservations } from "./daily-observations";
+import { Card } from "@/components/ui";
 
 export function ExperimentDetails({ id }: { id: string }) {
   const { experiments, referenceDate } = useExperiments();
@@ -109,13 +109,12 @@ export function ExperimentDetails({ id }: { id: string }) {
         )}
         <MetricChart experiment={experiment} />
       </Card>
-      <ResultsComparison experiment={experiment} />
+      <ResultsComparison experiment={experiment} completed={progress.completed} />
       {experiment.legacy && (
         <Card className="legacy-card">
-          <h2>{t.experiments.legacy}</h2>
-          <p className="muted">{t.experiments.legacyText}</p>
-          <details className="calculation-details">
-            <summary>{t.experiments.original}</summary>
+          <details className="legacy-disclosure">
+            <summary>{t.experiments.legacyDetails}</summary>
+            <p className="muted">{t.experiments.legacyText}</p>
             <p>
               <strong>{t.experiments.usual}:</strong> {experiment.legacy.conditionA}
             </p>
@@ -125,79 +124,7 @@ export function ExperimentDetails({ id }: { id: string }) {
           </details>
         </Card>
       )}
-      <Card className="entries-card">
-        <div className="section-heading">
-          <div>
-            <h2>{t.experiments.entries}</h2>
-            <p className="muted">{t.experiments.context}</p>
-          </div>
-          <span className="neutral-badge">{formatCount(experiment.entries.length, "entry")}</span>
-        </div>
-        {experiment.entries.length === 0 ? (
-          <div className="entries-empty">
-            <Icon name="calendar" />
-            <p>{t.experiments.noEntries}</p>
-          </div>
-        ) : (
-          <div className="table-scroll">
-            <table className="entries-table">
-              <caption className="sr-only">{t.experiments.entriesCaption}</caption>
-              <thead>
-                <tr>
-                  <th scope="col">{t.common.date}</th>
-                  <th scope="col">{t.experiments.status}</th>
-                  {experiment.metrics.map((metric) => (
-                    <th key={metric} scope="col">
-                      {METRICS[metric].label}
-                    </th>
-                  ))}
-                  <th scope="col">{t.common.note}</th>
-                  <th scope="col">{t.experiments.actions}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...experiment.entries].reverse().map((entry) => (
-                  <tr key={entry.id}>
-                    <th scope="row">
-                      <time dateTime={entry.observedDate}>{formatDate(entry.observedDate)}</time>
-                    </th>
-                    <td>
-                      <span
-                        className={cn(
-                          "habit-table-status",
-                          entry.habitStatus === "done" && "habit-table-done",
-                        )}
-                      >
-                        {entry.habitStatus === "done"
-                          ? t.common.done
-                          : entry.habitStatus === "not_done"
-                            ? t.common.notDone
-                            : t.common.notRecorded}
-                      </span>
-                    </td>
-                    {experiment.metrics.map((metric) => (
-                      <td key={metric}>
-                        {entry.values[metric] === undefined ? (
-                          "—"
-                        ) : (
-                          <>
-                            {entry.values[metric]}
-                            <span className="score-denominator"> / 10</span>
-                          </>
-                        )}
-                      </td>
-                    ))}
-                    <td className="entry-note-cell">{entry.note || "—"}</td>
-                    <td>
-                      <DailyEntryButton experiment={experiment} date={entry.observedDate} row />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+      <DailyObservations experiment={experiment} completed={progress.completed} />
     </>
   );
 }

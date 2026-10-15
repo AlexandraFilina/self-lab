@@ -1,7 +1,7 @@
 import { t } from "@/i18n";
 import type { Experiment } from "@/features/experiments/model/types";
 import { dayOffset } from "@/features/experiments/model/analytics";
-import { METRICS } from "@/features/experiments/model/metrics";
+import { metricColor, metricLabel, isMetricValue } from "@/features/experiments/model/metrics";
 
 export function MetricChart({ experiment }: { experiment: Experiment }) {
   const total = experiment.durationDays;
@@ -14,7 +14,28 @@ export function MetricChart({ experiment }: { experiment: Experiment }) {
   const plotWidth = width - left - right,
     plotHeight = height - top - bottom;
   const x = (day: number) => left + ((day + 0.5) / total) * plotWidth;
-  const y = (value: number) => top + ((10 - value) / 9) * plotHeight;
+  const scale = experiment.metrics[0].scale;
+  const y = (value: number) => top + ((scale.max - value) / (scale.max - scale.min)) * plotHeight;
+  const series = experiment.metrics.map((metric) => ({
+    metric,
+    points: experiment.entries
+      .flatMap((entry) => {
+        const value = entry.values[metric.id];
+        return isMetricValue(value, metric.scale)
+          ? [
+              {
+                day: dayOffset(experiment.startDate, entry.observedDate),
+                value,
+                date: entry.observedDate,
+              },
+            ]
+          : [];
+      })
+      .sort((a, b) => a.day - b.day),
+  }));
+  const hasGaps = series.some(({ points }) =>
+    points.some((point, index) => index > 0 && point.day - points[index - 1].day > 1),
+  );
   const ticks = [
     ...new Set([1, Math.ceil(total / 4), Math.ceil(total / 2), Math.ceil((total * 3) / 4), total]),
   ];
@@ -35,7 +56,10 @@ export function MetricChart({ experiment }: { experiment: Experiment }) {
         role="img"
         aria-label={t.experiments.chartLabel}
       >
-        {[1, 4, 7, 10].map((value) => (
+        {Array.from(
+          { length: 4 },
+          (_, index) => scale.min + (index * (scale.max - scale.min)) / 3,
+        ).map((value) => (
           <g key={value}>
             <line
               x1={left}
@@ -50,44 +74,50 @@ export function MetricChart({ experiment }: { experiment: Experiment }) {
             </text>
           </g>
         ))}
-        {experiment.metrics.map((metric) => {
-          let previousDay = -2;
-          const points = experiment.entries.flatMap((entry) => {
-            const value = entry.values[metric];
-            if (value === undefined) return [];
-            const day = dayOffset(experiment.startDate, entry.observedDate);
-            const point = { day, value, date: entry.observedDate };
-            return [point];
-          });
-          const path = points
-            .map((point) => {
-              const command = point.day === previousDay + 1 ? "L" : "M";
-              previousDay = point.day;
-              return `${command}${x(point.day)},${y(point.value)}`;
-            })
-            .join(" ");
+        {series.map(({ metric, points }) => {
+          const paths = { solid: "", dashed: "" };
+          for (let index = 1; index < points.length; index++) {
+            const previous = points[index - 1],
+              point = points[index];
+            const kind = point.day - previous.day > 1 ? "dashed" : "solid";
+            paths[kind] +=
+              `M${x(previous.day)},${y(previous.value)} L${x(point.day)},${y(point.value)} `;
+          }
           return (
-            <g key={metric}>
-              <path
-                d={path}
-                fill="none"
-                stroke={METRICS[metric].color}
-                strokeWidth="2.4"
-                strokeLinejoin="round"
-                strokeLinecap="round"
-              />
+            <g key={metric.id} data-metric-id={metric.id}>
+              {(["solid", "dashed"] as const).map(
+                (kind) =>
+                  paths[kind] && (
+                    <path
+                      key={kind}
+                      data-segment={kind}
+                      d={paths[kind].trim()}
+                      fill="none"
+                      stroke={metricColor(metric)}
+                      strokeWidth="2.4"
+                      strokeDasharray={kind === "dashed" ? "4 5" : undefined}
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                    />
+                  ),
+              )}
               {points.map((point) => (
                 <circle
                   key={point.date}
                   cx={x(point.day)}
                   cy={y(point.value)}
                   r="3"
-                  fill={METRICS[metric].color}
+                  fill={metricColor(metric)}
                   stroke="white"
                   strokeWidth="1"
                 >
                   <title>
-                    {t.experiments.pointTitle(METRICS[metric].label, point.value, point.day + 1)}
+                    {t.experiments.pointTitle(
+                      metricLabel(metric),
+                      point.value,
+                      point.day + 1,
+                      metric.scale.max,
+                    )}
                   </title>
                 </circle>
               ))}
@@ -107,12 +137,20 @@ export function MetricChart({ experiment }: { experiment: Experiment }) {
           </text>
         ))}
       </svg>
+      {series
+        .filter((series) => series.points.length === 1)
+        .map(({ metric }) => (
+          <p className="field-hint" key={metric.id}>
+            {metricLabel(metric)}: {t.experiments.singleObservation}
+          </p>
+        ))}
+      {hasGaps && <p className="field-hint">{t.experiments.chartGaps}</p>}
       <div className="chart-footer">
         <div className="chart-legend">
           {experiment.metrics.map((metric) => (
-            <span key={metric}>
-              <i style={{ backgroundColor: METRICS[metric].color }} />
-              {METRICS[metric].label}
+            <span key={metric.id}>
+              <i style={{ backgroundColor: metricColor(metric) }} />
+              {metricLabel(metric)}
             </span>
           ))}
         </div>

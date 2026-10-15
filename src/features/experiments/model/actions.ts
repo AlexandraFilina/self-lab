@@ -1,6 +1,13 @@
 import { AppError } from "@/lib/errors";
+import { DEFAULT_NUMERIC_SCALE } from "./types";
 import { addDays, dayOffset } from "@/lib/dates";
-import { dateSchema, getDailyEntrySchema, newExperimentSchema, timestampSchema } from "./schemas";
+import {
+  dateSchema,
+  getDailyEntrySchema,
+  newExperimentSchema,
+  timestampSchema,
+  customMetricSchema,
+} from "./schemas";
 import type { DailyEntry, DailyEntryDraft, Experiment, NewExperiment } from "./types";
 
 export function buildExperiment(draft: NewExperiment, id: string, startDate: string): Experiment {
@@ -66,4 +73,13 @@ export function experimentsReducer(state: Experiment[], action: ExperimentsActio
           : experiment,
       );
   }
+}
+
+export function buildCustomMetric(label: string, uuid: string) {
+  return customMetricSchema.parse({
+    id: `custom_${uuid}`,
+    label,
+    kind: "custom",
+    scale: { ...DEFAULT_NUMERIC_SCALE },
+  });
 }

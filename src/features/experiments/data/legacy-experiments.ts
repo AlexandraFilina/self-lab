@@ -1,14 +1,14 @@
 import type {
   LegacyDailyEntry as DailyEntry,
   LegacyExperiment as Experiment,
-  MetricId,
+  BuiltInMetricId,
 } from "../model/types";
 
 function entries(
   start: string,
   count: number,
   durationA: number,
-  metrics: MetricId[],
+  metrics: BuiltInMetricId[],
 ): DailyEntry[] {
   return Array.from({ length: count }, (_, index) => {
     const date = new Date(`${start}T12:00:00Z`);

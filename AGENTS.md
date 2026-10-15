@@ -6,10 +6,12 @@
 - Keep UI, domain rules, analytics, and persistence separate. Use the existing feature structure and implement only necessary extension points.
 - Explain why a dependency is needed before adding it. Prefer the existing stack and small solutions.
 - Daily habit comparison is the current experiment mode. `done`, `not_done`, unclassified imported observations, and missing check-ins are distinct. Never infer that a missing check-in means the habit was not completed.
+- Do not preselect metrics for new experiments. Custom metric definitions belong to one experiment, use stable UUID-based IDs independent of labels, and reject empty or case-insensitive duplicate selected names. Resolve built-in labels through i18n; preserve custom labels as user content. Only numeric 1–10 scales are implemented; use scale metadata in consumers. A single observation must not be rendered as a trend line.
 - Preserve legacy sample data through explicit, tested migration. Do not silently rescale stored metrics or invent habit completion for old observations.
 - Use the user's local calendar date. New check-ins are limited to today/yesterday inside the experiment window; older saved observations remain editable. Keep observedDate separate from recordedAt/updatedAt and preserve unknown historical timestamps as null. Reject future check-ins and duplicate experiment/date pairs. Persist through the repository boundary, never directly from a UI component.
 - Clearly label browser-only storage and fictional samples. Never present non-persistent actions, missing integrations, or unavailable features as working.
 - Analytics must use saved observations and deterministic, tested rules. Handle missing values, empty groups, and small samples honestly. Do not use AI APIs for user conclusions, imply causation, or claim statistical significance without a justified method.
+- Results are per metric: relative differences describe reported scores, never improvement or causation. Suppress percentages below five scored observations per group; show data quantity labels, never statistical confidence. Keep completed observations collapsed with editing available, and legacy conditions secondary.
 - Add tests for domain logic and critical user flows. Run available formatting, lint, type, test, and production build checks after changes. Report commands actually run and their results.
 - Never publish secrets or user data. Do not rewrite Git history or force-push. Do not commit or push without the user's explicit confirmation for the current changes.
 
