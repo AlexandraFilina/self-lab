@@ -9,6 +9,7 @@ import { ExperimentProgress, StatusBadge } from "./experiment-card";
 import { Icon } from "@/components/icon";
 import { MetricChart } from "./metric-chart";
 import { ResultsComparison } from "./results-comparison";
+import { ExperimentLifecycle } from "./experiment-lifecycle";
 import { DailyObservations } from "./daily-observations";
 import { Card } from "@/components/ui";
 
@@ -94,6 +95,7 @@ export function ExperimentDetails({ id }: { id: string }) {
         </div>
         <ExperimentProgress experiment={experiment} />
       </Card>
+      <ExperimentLifecycle experiment={experiment} />
       <Card className="detail-chart-card">
         <div className="section-heading">
           <div>

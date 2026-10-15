@@ -8,6 +8,7 @@ import {
   getResultsEnding,
   groupObservations,
   MIN_OBSERVATIONS,
+  observedWindowDays,
 } from "../model/analytics";
 import { metricLabel, metricColor } from "../model/metrics";
 import { Card } from "@/components/ui";
@@ -27,7 +28,7 @@ export function ResultsComparison({
   }));
   const ending = getResultsEnding(comparisons.map((item) => item.result));
   return (
-    <Card className="comparison-card">
+    <Card id="results" className="comparison-card">
       <div className="section-heading">
         <div>
           <h2>{t.analytics.title}</h2>
@@ -113,7 +114,7 @@ export function ResultsComparison({
         {completed && (
           <p className="muted">
             {t.analytics.missingDays(
-              Math.max(0, experiment.durationDays - experiment.entries.length),
+              Math.max(0, observedWindowDays(experiment) - experiment.entries.length),
             )}
           </p>
         )}

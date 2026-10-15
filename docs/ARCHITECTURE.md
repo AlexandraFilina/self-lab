@@ -18,9 +18,19 @@ The implemented mode is `daily_habit`. A discriminant provides a boundary for fu
 
 New observations require an explicit `done` or `not_done` status. Optional metric values are absent until selected. Legacy A/B entries retain their original scores, IDs, notes, dates, and conditions. Their habit status is unknown, so they are visible but excluded from done/not-done comparisons. The full legacy source is retained for traceability.
 
-`observedDate` is a date-only calendar string. New check-ins can be created only for today or yesterday within the observation window. Earlier saved entries can still be edited. `recordedAt` is the first successful save instant; `updatedAt` starts as null and changes on edit. Save/edit instants use ISO UTC timestamps; the observation day uses local calendar semantics. Version-four migration preserves version-one, version-two, and version-three observations without fabricating unknown timestamps. Existing built-in IDs remain unchanged when metric arrays are converted to definitions.
+`observedDate` is a date-only calendar string. New check-ins can be created only for today or yesterday within the observation window. Earlier saved entries can still be edited. `recordedAt` is the first successful save instant; `updatedAt` starts as null and changes on edit. Save/edit instants use ISO UTC timestamps; the observation day uses local calendar semantics. Version-five migration preserves version-one through version-four observations without fabricating unknown timestamps. Existing built-in IDs remain unchanged when metric arrays are converted to definitions.
 
 Date-only strings represent calendar dates. The current date is obtained from local browser date parts, not a UTC slice. Analytics use supplied data and dates without reading storage or a hidden clock.
+
+## Explicit lifecycle
+
+`Experiment.status` is Active or Completed; dates never determine that status. `completedAt` is an ISO timestamp or null for Active/unknown historical completion. `targetExtensions` stores previous/new duration and `extendedAt`. `getProgress` exposes explicit completion separately from `windowComplete`, calendar elapsed days, and recorded-day progress.
+
+`model/lifecycle.ts` validates finish, extend, and reopen commands as pure transformations. Finish accepts sparse or empty data. Reopen clears completedAt and keeps the same ID, metrics, entries, and extension history. Extend preserves observation dates, appends consecutive duration history, and enforces the existing 365-day total limit. If the old target expired, extension starts today. The provider supplies local today and actual timestamps, serializes lifecycle changes through the repository, and updates UI only after a successful save.
+
+Storage version 5 adds lifecycle to validated version 4 data. Older user experiments become Active without inventing a finish decision. Only the explicitly identified current completed sample becomes Completed; unknown completion instants remain null. Old storage schemas remain separate from the current schema so new required fields do not break historical validation. `observedWindowDays` limits missing-day counts to elapsed days when a real early-finish timestamp exists. The idempotent retired-sample content cleanup remains separate from the schema migration and never removes user-owned records.
+
+`ExperimentLifecycle` shares target-complete actions between Dashboard and Details. Native confirmation/extension dialogs retain the Strict Mode close guard. Finish navigates to `#results`; Reopen is secondary. New entries require Active status, while saved-date edits remain possible after completion. Dashboard statistics and list filters use the same explicit lifecycle via `getProgress`.
 
 ## Metric definitions
 
@@ -51,6 +61,8 @@ Next.js preserves inactive routes with React Activity. The creation form uses un
 ## Native dialog lifecycle
 
 Check-in uses the existing native modal. Development Strict Mode replays effect setup/cleanup: showing, closing, and showing the dialog can queue a close event while it is open again. The close handler dismisses only if the dialog is currently closed. This preserves real Escape/close behavior without dismissing a reopened dialog. Selecting an observation day mounts the form for that date and loads only that date’s existing values.
+
+Archive and permanent delete remain roadmap work; no destructive controls are implemented.
 
 ## Future Supabase integration
 

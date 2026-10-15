@@ -1,4 +1,4 @@
-import { addDays, dayOffset } from "@/lib/dates";
+import { addDays, dayOffset, localDate } from "@/lib/dates";
 import { isMetricValue } from "./metrics";
 import { DEFAULT_NUMERIC_SCALE, type NumericScale } from "./types";
 import type { DailyEntry, Experiment, MetricId } from "./types";
@@ -16,9 +16,19 @@ export function getProgress(experiment: Experiment, referenceDate: string) {
     total,
     day: Math.min(total, Math.max(1, elapsed + 1)),
     recorded,
-    completed: elapsed >= total,
+    completed: experiment.status === "completed",
+    windowComplete: elapsed >= total,
+    elapsedDays: Math.max(0, elapsed + 1),
     percent: total > 0 ? Math.min(100, Math.round((recorded / total) * 100)) : 0,
   };
+}
+export function observedWindowDays(experiment: Experiment) {
+  if (experiment.status !== "completed" || experiment.completedAt === null)
+    return experiment.durationDays;
+  return Math.min(
+    experiment.durationDays,
+    Math.max(0, dayOffset(experiment.startDate, localDate(new Date(experiment.completedAt))) + 1),
+  );
 }
 export function groupObservations(entries: readonly DailyEntry[]) {
   return {

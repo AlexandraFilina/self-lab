@@ -12,6 +12,7 @@ import {
 } from "react";
 import { AppError, errorMessage } from "@/lib/errors";
 import { localDate } from "@/lib/dates";
+import { applyLifecycle, type LifecycleIntent } from "../model/lifecycle";
 import { buildDailyEntry, buildExperiment, experimentsReducer } from "../model/actions";
 import { createLocalStorageRepository } from "../data/local-storage-repository";
 import { createSampleExperiments, ensureCompletedSample } from "../data/mock-experiments";
@@ -27,6 +28,7 @@ interface ExperimentsContextValue {
   reload: () => void;
   createExperiment: (draft: NewExperiment) => Promise<string>;
   saveEntry: (experimentId: string, entry: DailyEntryDraft, date?: string) => Promise<void>;
+  changeLifecycle: (experimentId: string, intent: LifecycleIntent) => Promise<void>;
 }
 const ExperimentsContext = createContext<ExperimentsContextValue | null>(null);
 export function ExperimentsProvider({ children }: { children: ReactNode }) {
@@ -153,6 +155,26 @@ export function ExperimentsProvider({ children }: { children: ReactNode }) {
     },
     [commit],
   );
+  const changeLifecycle = useCallback(
+    async (experimentId: string, intent: LifecycleIntent) => {
+      await commit((state) => {
+        const experiment = state.find((item) => item.id === experimentId);
+        if (!experiment) throw new AppError("experimentMissing");
+        const now = new Date();
+        const command =
+          intent.type === "finish"
+            ? { ...intent, completedAt: now.toISOString() }
+            : intent.type === "extend"
+              ? { ...intent, today: localDate(now), extendedAt: now.toISOString() }
+              : intent;
+        return experimentsReducer(state, {
+          type: "experimentUpdated",
+          experiment: applyLifecycle(experiment, command),
+        });
+      });
+    },
+    [commit],
+  );
   const value = useMemo(
     () => ({
       experiments,
@@ -163,8 +185,19 @@ export function ExperimentsProvider({ children }: { children: ReactNode }) {
       reload,
       createExperiment,
       saveEntry,
+      changeLifecycle,
     }),
-    [experiments, referenceDate, status, error, pending, reload, createExperiment, saveEntry],
+    [
+      experiments,
+      referenceDate,
+      status,
+      error,
+      pending,
+      reload,
+      createExperiment,
+      saveEntry,
+      changeLifecycle,
+    ],
   );
   return <ExperimentsContext.Provider value={value}>{children}</ExperimentsContext.Provider>;
 }

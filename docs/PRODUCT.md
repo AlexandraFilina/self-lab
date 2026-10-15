@@ -8,9 +8,18 @@ self lab is a personal laboratory for small experiments in everyday life. Its va
 2. Explicitly select built-in metrics or add custom metrics for this experiment, then start daily habit comparison. No metric is preselected.
 3. Choose today or yesterday within the experiment window, then record whether the habit was done or not done, score the selected metrics, and optionally add context.
 4. Edit a saved observation without creating another entry. Earlier saved dates remain editable; new observations cannot be backfilled before yesterday.
-5. Compare reported scores on done and not-done days once each metric has enough observations in both groups.
+5. Finish when ready, or extend the observation target. Reaching the target never completes the experiment automatically.
+6. Compare reported scores on done and not-done days once each metric has enough observations in both groups.
 
 A missed check-in is missing data, not a not-done day. Imported A/B observations with no completion information remain explicitly unclassified. Fictional samples are labelled and kept separate from the claim that these are the user's own measurements.
+
+## Experiment lifecycle
+
+Experiments have an explicit Active or Completed state. An elapsed target remains Active, with “Your observation window is complete”, recorded/target counts, “Finish & view results”, and “Keep observing”. Early finish is a secondary action and asks for confirmation with elapsed days, recorded observations, and Done / Not done counts. Finishing with sparse or no observations is allowed; results remain honest about insufficient data.
+
+Keep observing adds 7, 14, or custom positive whole days, up to a total target of 365 days. If the old target has already passed, added days start today; the preview shows the new target date. Historical dates and values never shift. Extensions store previous/new durations and timestamps. Reopen changes the same experiment back to Active, clears completedAt, and keeps observations and extension history. If its target is still expired, it offers the finish/extend choice again.
+
+Completed experiments allow editing saved observations; reopen is required before creating new check-ins. Completion timestamps are real save instants. Migration does not infer a user's finish decision from elapsed dates. Early-finished experiments do not count future target days as missing check-ins.
 
 ## Measurement and interpretation
 
@@ -38,6 +47,7 @@ This stage uses browser localStorage without an account or cross-device synchron
 - Additional experiment modes, including scheduled A/B periods.
 - More contextual metrics and carefully explained descriptive comparisons.
 - Additional locales using the existing typed dictionary boundary.
+- Archive and permanent delete with an explicit data-retention design; neither is implemented now.
 
 These are roadmap items, not current features. Paid services, research-based recommendations, AI APIs, push notifications, and complex statistical models are out of scope.
 

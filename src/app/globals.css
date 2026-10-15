@@ -2336,3 +2336,31 @@ thead th {
   line-height: 1.8;
   margin-top: 12px;
 }
+
+.lifecycle-card {
+  padding: 24px;
+}
+.lifecycle-card h2 {
+  font-size: 16px;
+}
+.lifecycle-card p,
+.lifecycle-summary p {
+  font-size: 12px;
+  line-height: 1.8;
+  margin-top: 10px;
+}
+.lifecycle-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+.lifecycle-controls {
+  margin: 16px 0;
+}
+.lifecycle-summary {
+  margin: 20px 0;
+}
+#results {
+  scroll-margin-top: 120px;
+}

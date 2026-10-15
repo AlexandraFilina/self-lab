@@ -20,7 +20,7 @@ export function createLocalStorageRepository(storage: StoragePort): ExperimentsR
   };
   const save = async (experiments: readonly Experiment[]) => {
     if (lastRead === undefined) throw new AppError("loading");
-    const parsed = workspaceSchema.safeParse({ version: 4, experiments });
+    const parsed = workspaceSchema.safeParse({ version: 5, experiments });
     if (!parsed.success) throw new AppError("storageCorrupt");
     const serialized = JSON.stringify(parsed.data);
     if (read() !== lastRead) throw new AppError("staleStorage");

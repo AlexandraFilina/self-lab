@@ -175,7 +175,7 @@ const storedEntrySchema = z
     (entry) => entry.habitStatus !== null || entry.origin === "legacy_ab",
     t.validation.imported,
   );
-export const experimentSchema = newExperimentSchema
+const versionFourExperimentSchema = newExperimentSchema
   .extend({
     id: z.string().min(1),
     mode: z.literal("daily_habit"),
@@ -198,9 +198,36 @@ export const experimentSchema = newExperimentSchema
         context.addIssue({ code: "custom", message: t.errors.outsideWindow });
       validateMetricValues(entry.values, experiment.metrics, context);
     }
+  });
+const extensionSchema = z
+  .object({
+    previousDurationDays: z.number().int().min(1).max(EXPERIMENT_LIMITS.maxDays),
+    durationDays: z.number().int().min(1).max(EXPERIMENT_LIMITS.maxDays),
+    extendedAt: timestampSchema,
+  })
+  .strict()
+  .refine((value) => value.durationDays > value.previousDurationDays, t.validation.extension);
+export const experimentSchema = versionFourExperimentSchema
+  .safeExtend({
+    status: z.enum(["active", "completed"]),
+    completedAt: timestampSchema.nullable(),
+    targetExtensions: z.array(extensionSchema),
+  })
+  .superRefine((experiment, context) => {
+    if (experiment.status === "active" && experiment.completedAt !== null)
+      context.addIssue({ code: "custom", message: t.validation.lifecycle });
+    for (let index = 0; index < experiment.targetExtensions.length; index++) {
+      const extension = experiment.targetExtensions[index];
+      const next = experiment.targetExtensions[index + 1];
+      if (
+        (next && next.previousDurationDays !== extension.durationDays) ||
+        (!next && extension.durationDays !== experiment.durationDays)
+      )
+        context.addIssue({ code: "custom", message: t.validation.extension });
+    }
   }) satisfies z.ZodType<Experiment>;
 export const workspaceSchema = z
-  .object({ version: z.literal(4), experiments: z.array(experimentSchema) })
+  .object({ version: z.literal(5), experiments: z.array(experimentSchema) })
   .strict()
   .refine(
     (state) =>
@@ -208,6 +235,12 @@ export const workspaceSchema = z
       state.experiments.length,
     t.validation.duplicateIds,
   );
+export const versionFourWorkspaceSchema = z
+  .object({
+    version: z.literal(4),
+    experiments: z.array(versionFourExperimentSchema),
+  })
+  .strict();
 
 export const versionTwoWorkspaceSchema = z
   .object({
@@ -215,7 +248,7 @@ export const versionTwoWorkspaceSchema = z
     experiments: z.array(
       z
         .object({
-          ...experimentSchema.shape,
+          ...versionFourExperimentSchema.shape,
           metrics: legacyMetricsSchema,
           entries: z.array(versionTwoEntrySchema),
         })
@@ -230,7 +263,7 @@ export const versionThreeWorkspaceSchema = z
     experiments: z.array(
       z
         .object({
-          ...experimentSchema.shape,
+          ...versionFourExperimentSchema.shape,
           metrics: legacyMetricsSchema,
           entries: z.array(previousStoredEntrySchema),
         })

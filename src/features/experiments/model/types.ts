@@ -35,7 +35,15 @@ export interface DailyEntry {
   note: string;
   origin: "check_in" | "legacy_ab";
 }
+export interface TargetExtension {
+  previousDurationDays: number;
+  durationDays: number;
+  extendedAt: string;
+}
 export interface Experiment {
+  status: ExperimentStatus;
+  completedAt: string | null;
+  targetExtensions: TargetExtension[];
   id: string;
   mode: "daily_habit";
   title: string;

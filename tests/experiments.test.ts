@@ -215,7 +215,8 @@ test("recorded-day progress is distinct from calendar progress", () => {
   assert.equal(getProgress(stored, addDays(TODAY, 7)).day, 8);
   assert.equal(getProgress(stored, addDays(TODAY, 7)).recorded, 1);
   assert.equal(getProgress(stored, addDays(TODAY, 27)).completed, false);
-  assert.equal(getProgress(stored, addDays(TODAY, 28)).completed, true);
+  assert.equal(getProgress(stored, addDays(TODAY, 28)).completed, false);
+  assert.equal(getProgress(stored, addDays(TODAY, 28)).windowComplete, true);
   assert.equal(endDate(stored), addDays(TODAY, 27));
 });
 test("not done, unclassified imports, and a missing check-in are different", () => {

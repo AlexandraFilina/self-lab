@@ -12,6 +12,7 @@
 - Clearly label browser-only storage and fictional samples. Never present non-persistent actions, missing integrations, or unavailable features as working.
 - Analytics must use saved observations and deterministic, tested rules. Handle missing values, empty groups, and small samples honestly. Do not use AI APIs for user conclusions, imply causation, or claim statistical significance without a justified method.
 - Results are per metric: relative differences describe reported scores, never improvement or causation. Suppress percentages below five scored observations per group; show data quantity labels, never statistical confidence. Keep completed observations collapsed with editing available, and legacy conditions secondary.
+- Lifecycle is explicit: elapsed targets stay Active until Finish. Preserve observations and target extension history; Reopen clears completedAt without copying data. Completed experiments permit edits, but require Reopen for new entries. Keep schema migration separate from sample cleanup; never infer a user finish decision from dates. Archive and permanent delete are not implemented.
 - Add tests for domain logic and critical user flows. Run available formatting, lint, type, test, and production build checks after changes. Report commands actually run and their results.
 - Never publish secrets or user data. Do not rewrite Git history or force-push. Do not commit or push without the user's explicit confirmation for the current changes.
 

@@ -5,7 +5,9 @@ import {
   workspaceSchema,
   versionTwoWorkspaceSchema,
   versionThreeWorkspaceSchema,
+  versionFourWorkspaceSchema,
 } from "../model/schemas";
+import { COMPLETED_SAMPLE_ID } from "./mock-experiments";
 import { builtInMetric } from "../model/metrics";
 import type { Experiment, LegacyExperiment } from "../model/types";
 
@@ -17,6 +19,9 @@ export function adaptLegacyExperiment(
   return {
     id: original.id,
     mode: "daily_habit",
+    status: "active",
+    completedAt: null,
+    targetExtensions: [],
     title: original.title,
     question: original.hypothesis,
     habit: original.conditionB,
@@ -42,7 +47,7 @@ export function decodeWorkspace(raw: string): { experiments: Experiment[]; migra
   } catch {
     throw new AppError("storageCorrupt");
   }
-  if (typeof value === "object" && value !== null && "version" in value && value.version === 4) {
+  if (typeof value === "object" && value !== null && "version" in value && value.version === 5) {
     const parsed = workspaceSchema.safeParse(value);
     if (!parsed.success) throw new AppError("storageCorrupt");
     return { experiments: parsed.data.experiments, migrated: false };
@@ -51,18 +56,28 @@ export function decodeWorkspace(raw: string): { experiments: Experiment[]; migra
     typeof value === "object" &&
     value !== null &&
     "version" in value &&
-    (value.version === 2 || value.version === 3)
+    (value.version === 2 || value.version === 3 || value.version === 4)
   ) {
     const previous =
       value.version === 2
         ? versionTwoWorkspaceSchema.safeParse(value)
-        : versionThreeWorkspaceSchema.safeParse(value);
+        : value.version === 3
+          ? versionThreeWorkspaceSchema.safeParse(value)
+          : versionFourWorkspaceSchema.safeParse(value);
     if (!previous.success) throw new AppError("storageCorrupt");
     const parsed = workspaceSchema.safeParse({
-      version: 4,
+      version: 5,
       experiments: previous.data.experiments.map((experiment) => ({
         ...experiment,
-        metrics: experiment.metrics.map(builtInMetric),
+        status:
+          experiment.source === "sample" && experiment.id === COMPLETED_SAMPLE_ID
+            ? "completed"
+            : "active",
+        completedAt: null,
+        targetExtensions: [],
+        metrics: experiment.metrics.map((metric) =>
+          typeof metric === "string" ? builtInMetric(metric) : metric,
+        ),
         entries: experiment.entries.map((entry) => {
           if (!("date" in entry)) return entry;
           const { date, ...original } = entry;
@@ -86,7 +101,7 @@ export function decodeWorkspace(raw: string): { experiments: Experiment[]; migra
   const legacy = z.array(legacyExperimentSchema).safeParse(legacyInput);
   if (!legacy.success) throw new AppError("storageCorrupt");
   const parsed = workspaceSchema.safeParse({
-    version: 4,
+    version: 5,
     experiments: legacy.data.map((experiment) => adaptLegacyExperiment(experiment, "user")),
   });
   if (!parsed.success) throw new AppError("storageCorrupt");

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { formatCount, formatDate } from "@/lib/format";
 import { endDate, getProgress, groupObservations } from "@/features/experiments/model/analytics";
 import { useExperiments } from "@/features/experiments/context/experiments-provider";
+import { ExperimentLifecycle } from "@/features/experiments/components/experiment-lifecycle";
 import { DailyEntryButton } from "@/features/experiments/components/daily-entry";
 import { ExperimentProgress, StatusBadge } from "@/features/experiments/components/experiment-card";
 import { Icon, type IconName } from "@/components/icon";
@@ -139,20 +140,24 @@ export function Dashboard() {
                 </Link>
               </div>
             </Card>
-            <Card className="today-card">
-              <span className="icon-tile">
-                <Icon name={todayEntry ? "check" : "sun"} />
-              </span>
-              <span className="eyebrow">{t.dashboard.next}</span>
-              <h2>{todayEntry ? t.dashboard.checked : t.dashboard.moment}</h2>
-              <p>{todayEntry ? t.dashboard.thanks : t.dashboard.reflect}</p>
-              <div className="today-period">
-                <span>{t.dashboard.today}</span>
-                <strong>{t.common.dayOf(progress.day, progress.total)}</strong>
-              </div>
-              <DailyEntryButton experiment={current} compact />
-              <small className="today-footnote">{t.dashboard.localNote}</small>
-            </Card>
+            {progress.windowComplete ? (
+              <ExperimentLifecycle experiment={current} />
+            ) : (
+              <Card className="today-card">
+                <span className="icon-tile">
+                  <Icon name={todayEntry ? "check" : "sun"} />
+                </span>
+                <span className="eyebrow">{t.dashboard.next}</span>
+                <h2>{todayEntry ? t.dashboard.checked : t.dashboard.moment}</h2>
+                <p>{todayEntry ? t.dashboard.thanks : t.dashboard.reflect}</p>
+                <div className="today-period">
+                  <span>{t.dashboard.today}</span>
+                  <strong>{t.common.dayOf(progress.day, progress.total)}</strong>
+                </div>
+                <DailyEntryButton experiment={current} compact />
+                <small className="today-footnote">{t.dashboard.localNote}</small>
+              </Card>
+            )}
           </div>
           <div className="dashboard-bottom">
             <Card className="trend-card">

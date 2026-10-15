@@ -157,7 +157,7 @@ class Browser {
 }
 
 test(
-  "critical browser flows: check-ins, custom metrics, completed results, reload, and responsive UI",
+  "critical browser flows: check-ins, results, lifecycle, reload, and responsive UI",
   { timeout: 120000 },
   async () => {
     const executable = [
@@ -705,6 +705,156 @@ test(
         "+24%",
       );
 
+      await navigate(`/experiments/${secondId}`, "Second browser experiment");
+      const beforeFinish = await userExperiment(secondId);
+      await page.click("Finish experiment");
+      await page.dialogOpen();
+      await page.screenshot(join(profile, "finish-experiment-desktop.png"));
+      assert.ok(
+        await page.evaluate(
+          "globalThis.__q('dialog').textContent.includes('1 recorded observation')",
+        ),
+      );
+      assert.ok(
+        await page.evaluate(
+          "globalThis.__q('dialog').textContent.includes('0 done days · 1 not-done day')",
+        ),
+      );
+      await page.evaluate(
+        "globalThis.__lifecycleWrite=Storage.prototype.setItem;Storage.prototype.setItem=function(){throw new DOMException('Quota exceeded','QuotaExceededError')}",
+      );
+      await page.click("Finish & view results", "dialog button");
+      await page.wait(
+        "globalThis.__q('dialog [role=alert]')?.textContent.includes('Could not save')",
+      );
+      assert.equal((await userExperiment(secondId)).status, "active");
+      await page.evaluate("Storage.prototype.setItem=globalThis.__lifecycleWrite");
+      await page.click("Finish & view results", "dialog button");
+      await page.wait("!globalThis.__q('dialog')&&location.hash==='#results'");
+      const finished = await userExperiment(secondId);
+      assert.equal(finished.status, "completed");
+      assert.ok(finished.completedAt);
+      assert.deepEqual(finished.entries, beforeFinish.entries);
+      assert.ok(
+        await page.evaluate(
+          "globalThis.__q('.comparison-card').textContent.includes('Not enough observations to compare yet.')",
+        ),
+      );
+      assert.equal(await page.evaluate("globalThis.__q('.observations-disclosure').open"), false);
+      await navigate(`/experiments/${secondId}`, "Second browser experiment");
+      assert.equal((await userExperiment(secondId)).status, "completed");
+      assert.equal((await userExperiment(secondId)).completedAt, finished.completedAt);
+      assert.equal(
+        await page.evaluate("globalThis.__q('.status-badge').textContent.trim()"),
+        "Completed",
+      );
+      await navigate("/experiments", "My experiments");
+      const activeFilter = await page.evaluate<string>(
+        "globalThis.__qa('.filter-tab').find(e=>e.textContent.startsWith('In progress')).textContent",
+      );
+      await page.click(activeFilter, ".filter-tab");
+      assert.equal(
+        await page.evaluate(
+          `globalThis.__qa('.experiment-card h2 a').some(e=>e.getAttribute('href')==='/experiments/${secondId}')`,
+        ),
+        false,
+      );
+      const finishedFilter = await page.evaluate<string>(
+        "globalThis.__qa('.filter-tab').find(e=>e.textContent.startsWith('Completed')).textContent",
+      );
+      await page.click(finishedFilter, ".filter-tab");
+      assert.ok(
+        await page.evaluate(
+          `globalThis.__qa('.experiment-card h2 a').some(e=>e.getAttribute('href')==='/experiments/${secondId}')`,
+        ),
+      );
+      await navigate("/dashboard", "Hello, curious mind");
+      assert.equal(
+        await page.evaluate(
+          "globalThis.__qa('.stat-value').map(e=>e.firstChild.textContent).join(',')",
+        ),
+        "2,23,2",
+      );
+      await navigate(`/experiments/${secondId}`, "Second browser experiment");
+      await page.click("Reopen experiment");
+      await page.wait("globalThis.__q('.status-badge')?.textContent.trim()==='In progress'");
+      await navigate(`/experiments/${secondId}`, "Second browser experiment");
+      const reopened = await userExperiment(secondId);
+      assert.equal(reopened.status, "active");
+      assert.equal(reopened.completedAt, null);
+      assert.deepEqual(reopened.entries, beforeFinish.entries);
+      assert.equal(await page.evaluate("globalThis.__qa('.entries-table tbody tr').length"), 1);
+
+      const targetWorkspace = await workspace();
+      const expired = targetWorkspace.experiments.find((item) => item.id === "browser-active");
+      assert.ok(expired);
+      expired.durationDays = 14;
+      const expiredEntries = structuredClone(expired.entries);
+      targetWorkspace.experiments = [
+        expired,
+        ...targetWorkspace.experiments.filter((item) => item.id !== expired.id),
+      ];
+      await page.evaluate(
+        `localStorage.setItem('self-lab:experiments',${JSON.stringify(JSON.stringify(targetWorkspace))})`,
+      );
+      await navigate("/dashboard", "Hello, curious mind");
+      assert.ok(
+        await page.evaluate(
+          "globalThis.__q('.lifecycle-card').textContent.includes('Your observation window is complete')",
+        ),
+      );
+      assert.ok(
+        await page.evaluate(
+          "globalThis.__q('.lifecycle-card').textContent.includes('You recorded 1 of 14 days.')",
+        ),
+      );
+      assert.equal((await userExperiment(expired.id)).status, "active");
+      await page.evaluate("globalThis.__q('.lifecycle-card').scrollIntoView({block:'center'})");
+      await page.screenshot(join(profile, "observation-target-desktop.png"));
+      await page.click("Keep observing");
+      await page.dialogOpen();
+      await page.screenshot(join(profile, "extend-target-desktop.png"));
+      await page.click("+14 days", "dialog button");
+      await page.click("+7 days", "dialog button");
+      await page.click("Extend observation target", "dialog button");
+      await page.wait("!globalThis.__q('dialog')");
+      assert.equal((await userExperiment(expired.id)).durationDays, 21);
+      assert.deepEqual((await userExperiment(expired.id)).entries, expiredEntries);
+      assert.equal((await userExperiment(expired.id)).targetExtensions.length, 1);
+      await navigate(`/experiments/${expired.id}`, "Browser check-in experiment");
+      await page.evaluate(
+        "globalThis.__LifecycleDate=Date;globalThis.Date=class extends globalThis.__LifecycleDate{constructor(...args){super(...(args.length?args:[globalThis.__LifecycleDate.now()+7*86400000]))}};window.dispatchEvent(new Event('focus'))",
+      );
+      await page.wait("!!globalThis.__q('.lifecycle-card')");
+      await page.click("Finish & view results", ".lifecycle-card button");
+      await page.dialogOpen();
+      await page.click("Finish & view results", "dialog button");
+      await page.wait("!globalThis.__q('dialog')&&!!globalThis.__q('.observations-disclosure')");
+      assert.equal((await userExperiment(expired.id)).status, "completed");
+      await page.click("Reopen experiment");
+      await page.wait("!!globalThis.__q('.lifecycle-card')");
+      await page.click("Keep observing");
+      await page.dialogOpen();
+      await page.click("Custom", "dialog button");
+      await page.fill("dialog input[name=additionalDays]", "0");
+      await page.click("Extend observation target", "dialog button");
+      await page.wait(
+        "globalThis.__q('dialog [role=alert]')?.textContent.includes('positive whole number')",
+      );
+      assert.equal((await userExperiment(expired.id)).durationDays, 21);
+      await page.fill("dialog input[name=additionalDays]", "2");
+      await page.click("Extend observation target", "dialog button");
+      await page.wait("!globalThis.__q('dialog')");
+      await page.evaluate(
+        "globalThis.Date=globalThis.__LifecycleDate;window.dispatchEvent(new Event('focus'))",
+      );
+      await navigate(`/experiments/${expired.id}`, "Browser check-in experiment");
+      const extended = await userExperiment(expired.id);
+      assert.equal(extended.durationDays, 23);
+      assert.equal(extended.targetExtensions.length, 2);
+      assert.deepEqual(extended.entries, expiredEntries);
+      assert.equal(extended.status, "active");
+
       await page.send("Emulation.setDeviceMetricsOverride", {
         width: 390,
         height: 844,
@@ -745,6 +895,25 @@ test(
       await page.screenshot(join(profile, "check-in-mobile.png"));
       await page.key("Escape", 27);
       await page.wait("!globalThis.__q('dialog')");
+      await navigate(`/experiments/${expired.id}`, "Browser check-in experiment");
+      await page.evaluate(
+        "globalThis.__MobileDate=Date;globalThis.Date=class extends globalThis.__MobileDate{constructor(...args){super(...(args.length?args:[globalThis.__MobileDate.now()+9*86400000]))}};window.dispatchEvent(new Event('focus'))",
+      );
+      await page.wait("!!globalThis.__q('.lifecycle-card')");
+      assert.ok(await page.evaluate("document.documentElement.scrollWidth<=window.innerWidth"));
+      await page.click("Keep observing");
+      await page.dialogOpen();
+      assert.ok(
+        await page.evaluate(
+          "globalThis.__q('dialog').scrollWidth<=globalThis.__q('dialog').clientWidth",
+        ),
+      );
+      await page.screenshot(join(profile, "extend-target-mobile.png"));
+      await page.click("Cancel", "dialog button");
+      await page.wait("!globalThis.__q('dialog')");
+      await page.evaluate(
+        "globalThis.Date=globalThis.__MobileDate;window.dispatchEvent(new Event('focus'))",
+      );
       const backup = await page.evaluate<string>("localStorage.getItem('self-lab:experiments')");
       await page.evaluate("localStorage.setItem('self-lab:experiments','invalid JSON')");
       await navigate("/dashboard", "Local storage needs attention");

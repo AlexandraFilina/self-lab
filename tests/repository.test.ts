@@ -1,3 +1,4 @@
+import { versionFourExperiment } from "./storage-fixtures";
 import { builtInMetric } from "../src/features/experiments/model/metrics";
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -153,7 +154,7 @@ test("legacy snapshots migrate without losing scores, notes, conditions, or date
   const storage = new MemoryStorage();
   storage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, experiments: LEGACY_EXPERIMENTS }));
   const migrated = await createLocalStorageRepository(storage).load();
-  assert.equal(JSON.parse(storage.getItem(STORAGE_KEY) ?? "{}").version, 4);
+  assert.equal(JSON.parse(storage.getItem(STORAGE_KEY) ?? "{}").version, 5);
   assert.deepEqual(migrated?.[0].legacy, LEGACY_EXPERIMENTS[0]);
   assert.ok(migrated?.[0].entries.every((entry) => entry.habitStatus === null));
 });
@@ -187,7 +188,9 @@ test("version-two observations migrate to observedDate without inventing save ti
     STORAGE_KEY,
     JSON.stringify({
       version: 2,
-      experiments: [{ ...experiment, metrics: ["mood"], entries: [previousEntry] }],
+      experiments: [
+        { ...versionFourExperiment(experiment), metrics: ["mood"], entries: [previousEntry] },
+      ],
     }),
   );
   const repository = createLocalStorageRepository(storage);
@@ -204,7 +207,7 @@ test("version-two observations migrate to observedDate without inventing save ti
     recordedAt: null,
     updatedAt: null,
   });
-  assert.equal(JSON.parse(storage.getItem(STORAGE_KEY) ?? "{}").version, 4);
+  assert.equal(JSON.parse(storage.getItem(STORAGE_KEY) ?? "{}").version, 5);
   assert.deepEqual(await createLocalStorageRepository(storage).load(), migrated);
   const edit = buildDailyEntry(
     migrated[0],

@@ -15,6 +15,9 @@ export function buildExperiment(draft: NewExperiment, id: string, startDate: str
     ...newExperimentSchema.parse(draft),
     id,
     mode: "daily_habit",
+    status: "active",
+    completedAt: null,
+    targetExtensions: [],
     startDate: dateSchema.parse(startDate),
     entries: [],
     source: "user",
@@ -34,6 +37,7 @@ export function buildDailyEntry(
   const day = dayOffset(experiment.startDate, date);
   if (day < 0 || day >= experiment.durationDays) throw new AppError("outsideWindow");
   const existing = experiment.entries.find((entry) => entry.observedDate === date);
+  if (experiment.status === "completed" && !existing) throw new AppError("completedEntry");
   if (!existing && date < addDays(today, -1)) throw new AppError("recentEntryOnly");
   const timestamp = timestampSchema.parse(savedAt);
   const parsed = getDailyEntrySchema(experiment.metrics).parse(draft);
@@ -53,9 +57,14 @@ export function buildDailyEntry(
 }
 export type ExperimentsAction =
   | { type: "experimentCreated"; experiment: Experiment }
-  | { type: "entrySaved"; experimentId: string; entry: DailyEntry };
+  | { type: "entrySaved"; experimentId: string; entry: DailyEntry }
+  | { type: "experimentUpdated"; experiment: Experiment };
 export function experimentsReducer(state: Experiment[], action: ExperimentsAction): Experiment[] {
   switch (action.type) {
+    case "experimentUpdated":
+      return state.map((experiment) =>
+        experiment.id === action.experiment.id ? action.experiment : experiment,
+      );
     case "experimentCreated":
       return [action.experiment, ...state];
     case "entrySaved":

@@ -50,6 +50,9 @@ export function createCompletedSampleExperiment(today: string): Experiment {
   return {
     id: COMPLETED_SAMPLE_ID,
     mode: "daily_habit",
+    status: "completed",
+    completedAt: null,
+    targetExtensions: [],
     source: "sample",
     title: t.samples.completedTitle,
     question: t.samples.completedQuestion,

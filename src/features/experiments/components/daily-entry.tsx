@@ -40,7 +40,10 @@ export function DailyEntryButton({
     );
   const targetDate = date ?? [referenceDate, yesterday].find(withinWindow) ?? "";
   const existing = experiment.entries.some((entry) => entry.observedDate === targetDate);
-  const canCheckIn = withinWindow(targetDate) && (existing || targetDate >= yesterday);
+  const canCheckIn =
+    withinWindow(targetDate) &&
+    (existing || targetDate >= yesterday) &&
+    (experiment.status === "active" || (row && existing));
   if (!canCheckIn && !openDate) return null;
   return (
     <div className={className}>

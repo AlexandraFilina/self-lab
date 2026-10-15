@@ -1,3 +1,4 @@
+import { versionFourExperiment } from "./storage-fixtures";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createElement } from "react";
@@ -19,6 +20,8 @@ import {
   STORAGE_KEY,
   type StoragePort,
 } from "../src/features/experiments/data/local-storage-repository";
+import { adaptLegacyExperiment } from "../src/features/experiments/data/migration";
+import { LEGACY_EXPERIMENTS } from "../src/features/experiments/data/legacy-experiments";
 import { createSampleExperiments } from "../src/features/experiments/data/mock-experiments";
 import { MetricChart } from "../src/features/experiments/components/metric-chart";
 import type { DailyEntry, NewExperiment } from "../src/features/experiments/model/types";
@@ -91,7 +94,7 @@ test("custom observations persist by metric ID and edit the same date without du
   const reloaded = await createLocalStorageRepository(storage).load();
   assert.deepEqual(reloaded, saved);
   assert.equal(reloaded?.[0].entries[0].values[focus.id], 8);
-  assert.equal(JSON.parse(storage.getItem(STORAGE_KEY) ?? "{}").version, 4);
+  assert.equal(JSON.parse(storage.getItem(STORAGE_KEY) ?? "{}").version, 5);
   const edit = buildDailyEntry(
     saved[0],
     { habitStatus: "not_done", values: { [focus.id]: 4 } },
@@ -188,9 +191,12 @@ test("identical one-point metrics stay separate observations without a relations
 });
 test("version-three migration preserves scores, timestamps, IDs, and legacy archives", async () => {
   const storage = memoryStorage();
-  const samples = createSampleExperiments(TODAY);
+  const samples = [
+    ...createSampleExperiments(TODAY),
+    ...LEGACY_EXPERIMENTS.map((item) => adaptLegacyExperiment(item)),
+  ];
   const previous = samples.map((item) => ({
-    ...item,
+    ...versionFourExperiment(item),
     metrics: item.metrics.map((metric) => metric.id),
   }));
   previous[0].entries[0].recordedAt = "2026-10-01T12:00:00.000Z";
@@ -207,7 +213,7 @@ test("version-three migration preserves scores, timestamps, IDs, and legacy arch
     );
     assert.ok(item.metrics.every((metric) => metric.kind === "built_in"));
   }
-  assert.equal(JSON.parse(storage.getItem(STORAGE_KEY) ?? "{}").version, 4);
+  assert.equal(JSON.parse(storage.getItem(STORAGE_KEY) ?? "{}").version, 5);
   assert.deepEqual(await createLocalStorageRepository(storage).load(), restored);
 });
 test("unsupported scales are rejected until their product behavior is implemented", () => {
