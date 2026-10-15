@@ -182,7 +182,9 @@ test("completed observations use a closed native disclosure by default while act
       createElement(
         ExperimentsProvider,
         null,
-        createElement(DailyObservations, { experiment, completed }),
+        createElement(DailyObservations, {
+          experiment: { ...experiment, status: completed ? "completed" : "active" },
+        }),
       ),
     );
   const html = render(true);
@@ -248,4 +250,15 @@ test("completed results and calculation inputs remain identical after repository
   assert.equal(after, before);
   assert.ok(after.includes("+24%"));
   assert.ok(after.includes(t.analytics.causalLimit));
+});
+
+test("completed experiments with no observations also start with a closed disclosure", () => {
+  const experiment = { ...createCompletedSampleExperiment(TODAY), entries: [] };
+  const html = renderToStaticMarkup(
+    createElement(ExperimentsProvider, null, createElement(DailyObservations, { experiment })),
+  );
+  assert.match(html, /<details class="observations-disclosure">/);
+  assert.ok(html.includes("View 0 daily observations"));
+  assert.ok(html.includes(t.experiments.noSavedEntries));
+  assert.doesNotMatch(html, /<details[^>]*\bopen(?:=|\s|>)/);
 });

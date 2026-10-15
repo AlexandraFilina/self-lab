@@ -1,5 +1,6 @@
 import { t } from "@/i18n";
 import type { Experiment } from "@/features/experiments/model/types";
+import { buildChartSegments } from "../model/chart-segments";
 import { dayOffset } from "@/features/experiments/model/analytics";
 import { metricColor, metricLabel, isMetricValue } from "@/features/experiments/model/metrics";
 
@@ -33,8 +34,12 @@ export function MetricChart({ experiment }: { experiment: Experiment }) {
       })
       .sort((a, b) => a.day - b.day),
   }));
-  const hasGaps = series.some(({ points }) =>
-    points.some((point, index) => index > 0 && point.day - points[index - 1].day > 1),
+  const segmentedSeries = series.map((item) => ({
+    ...item,
+    segments: buildChartSegments(item.points),
+  }));
+  const hasGaps = segmentedSeries.some(({ segments }) =>
+    segments.some((segment) => segment.kind === "dashed"),
   );
   const ticks = [
     ...new Set([1, Math.ceil(total / 4), Math.ceil(total / 2), Math.ceil((total * 3) / 4), total]),
@@ -74,14 +79,11 @@ export function MetricChart({ experiment }: { experiment: Experiment }) {
             </text>
           </g>
         ))}
-        {series.map(({ metric, points }) => {
+        {segmentedSeries.map(({ metric, points, segments }) => {
           const paths = { solid: "", dashed: "" };
-          for (let index = 1; index < points.length; index++) {
-            const previous = points[index - 1],
-              point = points[index];
-            const kind = point.day - previous.day > 1 ? "dashed" : "solid";
-            paths[kind] +=
-              `M${x(previous.day)},${y(previous.value)} L${x(point.day)},${y(point.value)} `;
+          for (const segment of segments) {
+            paths[segment.kind] +=
+              `M${x(dayOffset(experiment.startDate, segment.from.date))},${y(segment.from.value)} L${x(dayOffset(experiment.startDate, segment.to.date))},${y(segment.to.value)} `;
           }
           return (
             <g key={metric.id} data-metric-id={metric.id}>

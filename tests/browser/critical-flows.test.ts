@@ -657,7 +657,7 @@ test(
       );
       assert.ok(
         await page.evaluate(
-          "globalThis.__q('.chart-container').textContent.includes('Dashed segments cross days with no recorded score.')",
+          "globalThis.__q('.chart-container').textContent.includes('Dashed lines cross days with no recorded score.')",
         ),
       );
       await page.click("How was this calculated?", "summary");
@@ -675,6 +675,15 @@ test(
         );
       await page.click("View 21 daily observations", "summary");
       assert.equal(await page.evaluate("globalThis.__qa('.entries-table tbody tr').length"), 21);
+      await page.click("View 21 daily observations", "summary");
+      assert.equal(await page.evaluate("globalThis.__qa('.entries-table tbody tr').length"), 0);
+      await page.click("View 21 daily observations", "summary");
+      await page.click("← Back to experiments", "a");
+      await page.wait("!!globalThis.__q('.experiments-grid')");
+      await page.click(completedTitle, ".experiment-card h2 a");
+      await page.wait(`globalThis.__q('h1')?.textContent===${JSON.stringify(completedTitle)}`);
+      assert.equal(await page.evaluate("globalThis.__q('.observations-disclosure').open"), false);
+      await page.click("View 21 daily observations", "summary");
       const completedBefore = await userExperiment(completedId);
       const editedDate = await page.evaluate<string>(
         "globalThis.__q('.entries-table tbody time').dateTime",
@@ -710,6 +719,20 @@ test(
       await page.click("Finish experiment");
       await page.dialogOpen();
       await page.screenshot(join(profile, "finish-experiment-desktop.png"));
+      assert.equal(
+        await page.evaluate("globalThis.__q('dialog h2').textContent"),
+        "Finish this experiment?",
+      );
+      assert.ok(
+        await page.evaluate(
+          "globalThis.__q('dialog').textContent.includes('even if the planned observation window is not complete')",
+        ),
+      );
+      await page.click("Keep observing", "dialog button");
+      await page.wait("!globalThis.__q('dialog')");
+      assert.equal((await userExperiment(secondId)).status, "active");
+      await page.click("Finish experiment");
+      await page.dialogOpen();
       assert.ok(
         await page.evaluate(
           "globalThis.__q('dialog').textContent.includes('1 recorded observation')",
@@ -829,9 +852,13 @@ test(
       await page.click("Finish & view results", ".lifecycle-card button");
       await page.dialogOpen();
       await page.click("Finish & view results", "dialog button");
-      await page.wait("!globalThis.__q('dialog')&&!!globalThis.__q('.observations-disclosure')");
+      await page.wait(
+        "!globalThis.__q('dialog')&&location.hash==='#results'&&!!globalThis.__q('.observations-disclosure')",
+      );
       assert.equal((await userExperiment(expired.id)).status, "completed");
       await page.click("Reopen experiment");
+      await page.wait("globalThis.__q('.status-badge')?.textContent.trim()==='In progress'");
+      await page.evaluate("window.dispatchEvent(new Event('focus'))");
       await page.wait("!!globalThis.__q('.lifecycle-card')");
       await page.click("Keep observing");
       await page.dialogOpen();

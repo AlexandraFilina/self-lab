@@ -1,3 +1,6 @@
+"use client";
+
+import { useCallback } from "react";
 import { t } from "@/i18n";
 import { formatCount, formatDate } from "@/lib/format";
 import type { Experiment } from "../model/types";
@@ -6,18 +9,18 @@ import { DailyEntryButton } from "./daily-entry";
 import { Icon } from "@/components/icon";
 import { Card, cn } from "@/components/ui";
 
-export function DailyObservations({
-  experiment,
-  completed,
-}: {
-  experiment: Experiment;
-  completed: boolean;
-}) {
+export function DailyObservations({ experiment }: { experiment: Experiment }) {
+  const completed = experiment.status === "completed";
+  const resetDisclosure = useCallback((element: HTMLDetailsElement | null) => {
+    return () => {
+      if (element) element.open = false;
+    };
+  }, []);
   const content =
     experiment.entries.length === 0 ? (
       <div className="entries-empty">
         <Icon name="calendar" />
-        <p>{t.experiments.noEntries}</p>
+        <p>{completed ? t.experiments.noSavedEntries : t.experiments.noEntries}</p>
       </div>
     ) : (
       <div className="table-scroll">
@@ -80,8 +83,8 @@ export function DailyObservations({
     );
   return (
     <Card className="entries-card">
-      {completed && experiment.entries.length > 0 ? (
-        <details className="observations-disclosure">
+      {completed ? (
+        <details ref={resetDisclosure} className="observations-disclosure">
           <summary>{t.experiments.viewObservations(experiment.entries.length)}</summary>
           {content}
         </details>

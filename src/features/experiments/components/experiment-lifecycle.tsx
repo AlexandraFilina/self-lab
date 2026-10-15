@@ -14,7 +14,13 @@ import { useExperiments } from "../context/experiments-provider";
 
 type DialogAction = "finish" | "extend";
 
-export function ExperimentLifecycle({ experiment }: { experiment: Experiment }) {
+export function ExperimentLifecycle({
+  experiment,
+  compact = false,
+}: {
+  experiment: Experiment;
+  compact?: boolean;
+}) {
   const { referenceDate, changeLifecycle, pending } = useExperiments();
   const router = useRouter();
   const [action, setAction] = useState<DialogAction | null>(null);
@@ -47,7 +53,7 @@ export function ExperimentLifecycle({ experiment }: { experiment: Experiment }) 
         <Button variant="secondary" disabled={pending} onClick={reopen}>
           {t.lifecycle.reopen}
         </Button>
-      ) : progress.windowComplete ? (
+      ) : progress.windowComplete && !compact ? (
         <>
           <h2>{t.lifecycle.windowComplete}</h2>
           <p>{t.lifecycle.recorded(progress.recorded, progress.total)}</p>
@@ -76,7 +82,7 @@ export function ExperimentLifecycle({ experiment }: { experiment: Experiment }) 
         </>
       ) : (
         <Button
-          variant="ghost"
+          variant="secondary"
           disabled={pending}
           onClick={() => {
             setFeedback("");
@@ -107,7 +113,7 @@ export function ExperimentLifecycle({ experiment }: { experiment: Experiment }) 
       )}
     </>
   );
-  return progress.windowComplete && !progress.completed ? (
+  return progress.windowComplete && !progress.completed && !compact ? (
     <Card className="lifecycle-card">{content}</Card>
   ) : (
     <div className="lifecycle-controls">{content}</div>
@@ -184,6 +190,7 @@ function LifecycleDialog({
           {action === "finish" ? t.lifecycle.finishConfirm : t.lifecycle.extendTitle}
         </h2>
         <p className="muted">{experiment.title}</p>
+        {action === "finish" && <p className="field-hint">{t.lifecycle.finishDescription}</p>}
         <form noValidate onSubmit={submit}>
           {action === "finish" ? (
             <>
@@ -191,6 +198,15 @@ function LifecycleDialog({
                 <p>{t.lifecycle.elapsed(progress.elapsedDays)}</p>
                 <p>{t.lifecycle.observations(experiment.entries.length)}</p>
                 <p>{t.analytics.metricCounts(groups.done.length, groups.notDone.length)}</p>
+                <p>
+                  {t.lifecycle.missingDays(
+                    Math.max(
+                      0,
+                      Math.min(progress.elapsedDays, experiment.durationDays) -
+                        experiment.entries.length,
+                    ),
+                  )}
+                </p>
               </div>
               <p className="field-hint">{t.lifecycle.finishHelp}</p>
             </>
@@ -251,7 +267,7 @@ function LifecycleDialog({
           )}
           <div className="dialog-actions">
             <Button variant="secondary" type="button" disabled={saving} onClick={onDismiss}>
-              {t.common.cancel}
+              {action === "finish" ? t.lifecycle.keepObserving : t.common.cancel}
             </Button>
             <Button type="submit" disabled={saving}>
               {saving

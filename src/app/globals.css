@@ -2364,3 +2364,13 @@ thead th {
 #results {
   scroll-margin-top: 120px;
 }
+
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.detail-actions .lifecycle-controls {
+  margin: 0;
+}

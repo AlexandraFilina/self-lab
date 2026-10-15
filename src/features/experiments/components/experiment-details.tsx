@@ -51,7 +51,12 @@ export function ExperimentDetails({ id }: { id: string }) {
             {formatCount(progress.total, "day")}
           </p>
         </div>
-        <DailyEntryButton experiment={experiment} />
+        <div className="detail-actions">
+          <DailyEntryButton experiment={experiment} />
+          {experiment.status === "active" && (
+            <ExperimentLifecycle experiment={experiment} compact />
+          )}
+        </div>
       </div>
       <Card className="hypothesis-card">
         <span className="icon-tile small">
@@ -95,7 +100,9 @@ export function ExperimentDetails({ id }: { id: string }) {
         </div>
         <ExperimentProgress experiment={experiment} />
       </Card>
-      <ExperimentLifecycle experiment={experiment} />
+      {(progress.completed || progress.windowComplete) && (
+        <ExperimentLifecycle experiment={experiment} />
+      )}
       <Card className="detail-chart-card">
         <div className="section-heading">
           <div>
@@ -126,7 +133,7 @@ export function ExperimentDetails({ id }: { id: string }) {
           </details>
         </Card>
       )}
-      <DailyObservations experiment={experiment} completed={progress.completed} />
+      <DailyObservations key={`${experiment.id}:${experiment.status}`} experiment={experiment} />
     </>
   );
 }

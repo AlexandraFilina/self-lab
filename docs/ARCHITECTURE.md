@@ -30,7 +30,7 @@ Date-only strings represent calendar dates. The current date is obtained from lo
 
 Storage version 5 adds lifecycle to validated version 4 data. Older user experiments become Active without inventing a finish decision. Only the explicitly identified current completed sample becomes Completed; unknown completion instants remain null. Old storage schemas remain separate from the current schema so new required fields do not break historical validation. `observedWindowDays` limits missing-day counts to elapsed days when a real early-finish timestamp exists. The idempotent retired-sample content cleanup remains separate from the schema migration and never removes user-owned records.
 
-`ExperimentLifecycle` shares target-complete actions between Dashboard and Details. Native confirmation/extension dialogs retain the Strict Mode close guard. Finish navigates to `#results`; Reopen is secondary. New entries require Active status, while saved-date edits remain possible after completion. Dashboard statistics and list filters use the same explicit lifecycle via `getProgress`.
+`ExperimentLifecycle` shares target-complete actions between Dashboard and Details. Native confirmation/extension dialogs retain the Strict Mode close guard. Finish is a secondary header action on active Details, including before the target date. Confirmation shows elapsed/recorded/missing counts with a Keep observing dismissal. Finish navigates to `#results`; Reopen is secondary. New entries require Active status, while saved-date edits remain possible after completion. Dashboard statistics and list filters use the same explicit lifecycle via `getProgress`.
 
 ## Metric definitions
 
@@ -38,7 +38,7 @@ Each experiment owns its metric definitions. A definition distinguishes `built_i
 
 All currently accepted scales are numeric 1–10 with step 1. Sliders, validation, charts, and analytics consume scale metadata, while unsupported scale variants are rejected. Boolean, duration, count, alternative ranges, and a global custom metric library are not implemented.
 
-Analytics receive a metric ID and numeric scale separately from the display label. Chart series with one scored observation contain a point, no line, and a localized explanation. Consecutive recorded days connect with solid paths; missing-score calendar days are crossed with dashed bridges and a dictionary explanation. Circles and tooltips exist only for actual recorded scores. Coincident scores do not imply a relationship between metrics.
+Analytics receive a metric ID and numeric scale separately from the display label. Chart series with one scored observation contain a point, no line, and a localized explanation. `buildChartSegments` takes sorted recorded observations and produces solid segments for adjacent calendar dates and dashed segments for gaps. It never creates values, rejects unordered/duplicate dates, and is shared by built-in/custom series. Missing-score calendar days are crossed with dashed bridges and a dictionary explanation. Circles and tooltips exist only for actual recorded scores. Coincident scores do not imply a relationship between metrics.
 
 ## Results presentation
 
@@ -46,7 +46,7 @@ Analytics receive a metric ID and numeric scale separately from the display labe
 
 The existing half-point similarity rule suppresses directional headlines for small absolute differences. `getResultDirection` describes other relative differences below 10% as slight. `getDataStrength` uses the smaller scored group with boundaries 5 and 10; these are descriptive counts, not confidence. No scores are pooled across metrics. `getResultsEnding` selects only supportive dictionary copy from the independent metric results.
 
-`ResultsComparison` renders per-metric cards and an expandable calculation table in its existing layout slot. The chart retains its position. `DailyObservations` wraps the existing editable table in a closed native disclosure for completed experiments; active tables remain expanded. Legacy conditions use a separate compact native disclosure. All system copy comes from i18n, while custom names remain user content.
+`ResultsComparison` renders per-metric cards and an expandable calculation table in its existing layout slot. The chart retains its position. `DailyObservations` reads explicit status and wraps the existing editable table in a closed native disclosure for completed experiments, including empty ones; active tables remain expanded. A stable callback-ref cleanup closes the disclosure when Activity hides the route, and a lifecycle key resets it after transitions. Legacy conditions use a separate compact native disclosure. All system copy comes from i18n, while custom names remain user content.
 
 ## Persistence boundary
 

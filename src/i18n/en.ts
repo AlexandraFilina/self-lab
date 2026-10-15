@@ -119,6 +119,7 @@ export const en = {
     trendText: "Daily scores on the original 1–10 scale. Missing values stay empty.",
     entries: "Daily check-ins",
     context: "Context matters just as much as the numbers.",
+    noSavedEntries: "No observations were recorded.",
     noEntries: "Your first check-in will appear here. Start with today.",
     entriesCaption: "Daily habit status, scores, and notes, newest entries first",
     status: "Habit status",
@@ -137,7 +138,7 @@ export const en = {
     chartEmptyText: "Add your first check-in to see how your scores change over time.",
     chartLabel:
       "Daily scores on a scale of 1 to 10. Exact values are available in the daily check-ins table.",
-    chartGaps: "Dashed segments cross days with no recorded score.",
+    chartGaps: "Dashed lines cross days with no recorded score.",
     chartDays: "Experiment days",
     pointTitle: (label: string, value: number, day: number, max: number) =>
       `${label}: ${value} / ${max} · day ${day}`,
@@ -185,7 +186,11 @@ export const en = {
     targetPrompt: "Review what you observed, or give yourself more time.",
     finishResults: "Finish & view results",
     finish: "Finish experiment",
-    finishConfirm: "Finish this experiment and review what you've observed?",
+    finishConfirm: "Finish this experiment?",
+    finishDescription:
+      "You can review your observations now, even if the planned observation window is not complete.",
+    missingDays: (count: number) =>
+      `${count} elapsed ${count === 1 ? "day" : "days"} with no entry`,
     elapsed: (days: number) => `${days} elapsed ${days === 1 ? "day" : "days"}`,
     observations: (count: number) =>
       `${count} recorded ${count === 1 ? "observation" : "observations"}`,
