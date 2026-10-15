@@ -10,6 +10,7 @@
 /coverage
 
 /.next/
+/.next-browser/
 /out/
 
 /build
@@ -23,6 +24,7 @@ yarn-error.log*
 .pnpm-debug.log*
 
 .env*
+!.env.example
 
 .vercel
 

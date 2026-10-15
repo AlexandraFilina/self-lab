@@ -1,130 +1,106 @@
-# self lab — Habit Experiments
+# Self Lab
 
-A personal laboratory for exploring how everyday habits relate to reported sleep, mood, energy, and productivity. Start with a question, record done and not-done days, and discover patterns in your own observations.
+Personal habit experiments: record Done / Not done observations, optionally score built-in or custom metrics, and compare reported scores without claiming causation.
 
-Built on the existing Next.js, React, TypeScript, Tailwind CSS, and adapted shadcn/ui interface. The application and documentation remain in English; the existing visual system is preserved.
+Stage 8A adds a real PostgreSQL backend to the existing Next.js application. The visual system and pure domain/analytics rules are preserved. Authentication is **not implemented**: this stage uses one explicitly enabled, shared development workspace. Run it on trusted localhost; workspace IDs are not access credentials.
 
-## Run locally
+## Local setup
 
-Use Node.js 24 LTS, matching `.nvmrc`.
+Requires Node.js from [.nvmrc](.nvmrc), Docker Desktop with Compose, and Chrome for browser tests.
+
+1. Copy [.env.example](.env.example) to `.env.local`.
+2. Replace `CHANGE_ME` with a locally generated password in **all three places**: `POSTGRES_PASSWORD`, `DATABASE_URL`, and `TEST_DATABASE_URL`. For example, generate a hex password with `node -e "console.log(require('node:crypto').randomBytes(24).toString('hex'))"`. Hex needs no URL escaping. Never commit the resulting file.
+3. Start development PostgreSQL, install dependencies, and apply migrations:
 
 ```bash
+docker compose up -d --wait
 npm ci
+npm run db:migrate
+npm run db:seed
+npm run db:status
 npm run dev
 ```
 
-Open [localhost:3000/dashboard](http://localhost:3000/dashboard). Development and production builds use Webpack and the standard Tailwind PostCSS adapter. System fonts do not require external downloads.
+Open [localhost:3000/dashboard](http://localhost:3000/dashboard). The development workspace is created idempotently. Seed creates only that workspace; fictional experiments remain read-only frontend fixtures and are never inserted into PostgreSQL.
+
+Docker's CLI must be on PATH. On macOS, if Docker Desktop is running but `docker` is not found, enable its CLI tools installation or use `/Applications/Docker.app/Contents/Resources/bin/docker`.
 
 ```bash
-npm run build
-npm start
+docker compose ps
+docker compose down
 ```
 
-## What works
+Development data persists in the named Docker volume across ordinary `down` / `up`. Do not remove the volume to apply a migration. PostgreSQL binds to localhost port 5432; the separate test service uses port 5433. Changing the password in the environment does not change an already initialized database user's password.
 
-- Start with a blank question on Dashboard when there are no user-owned experiments. Continue to the shared New Experiment form to describe a habit, select metrics, and choose an observation target. Existing users keep the regular Dashboard.
-- Choose one of five optional idea presets, edit every field, or write your own question. Blank drafts have no preselected metrics; presets select metrics only after an explicit click. Ideas are inspiration, not scientific recommendations. A separate link opens the labelled sample.
-- Create a daily habit experiment without generating automatic check-ins. Details offers “Start observing today” and the existing Check in CTA.
-- Decide when to finish: reaching the target keeps the experiment Active and offers “Finish & view results” or “Keep observing”. An active Details header always includes a secondary Finish experiment action. Confirmation shows elapsed days, recorded observations, Done / Not done, and elapsed missing-day counts; Keep observing dismisses it without changes.
-- Extend the target by 7, 14, or a custom positive number of days, retaining a timestamped target history and all observations. Reopen a completed experiment without creating a copy.
-- Use Dashboard “Today’s check-ins” for every Active user experiment: pending rows first, then checked-in rows, retaining saved order within each group. Check in or Edit opens the existing check-in dialog, and successful saves immediately update the list and daily summary. Samples and Completed experiments never enter these rows.
-- Add yesterday through a quiet secondary action only when that date is inside the target and has no entry. Older empty days stay missing data, without a backlog.
-- Record **Done** or **Not done** for today or yesterday, optionally rate selected metrics, and add a note.
-- Create entries only for today or yesterday within the experiment window. Edit older saved entries without creating a duplicate. Future dates are rejected. Observation dates and save/edit timestamps are stored separately.
-- Keep experiments and check-ins after reload using a separate, versioned localStorage repository.
-- Create another experiment with a fresh form. Failed saves keep the input and leave the previous saved snapshot unchanged.
-- Read a separate “What you observed” result for each metric, with relative differences in reported scores, scored group sizes, descriptive data labels, and expandable calculation details.
-- Review a completed daily sample with overlapping scores, missing days, and a collapsed observations table that preserves editing.
-- Add experiment-local custom metrics with stable UUID-based IDs, required names up to 40 characters, case-insensitive duplicate checks, and removal before creation. Built-in labels come from the English dictionary; custom labels remain user content.
-- Show a single scored observation as a point without a trend line. Connect adjacent recorded days with solid lines and cross missing-score days with labelled dashed bridges; no scores or tooltips are invented.
-- Use a reusable keyboard-accessible metric slider with seven semantic descriptions on the unchanged numeric 1–10 scale. Unrated values remain missing.
+`npm run db:generate` generates a checked-in Drizzle migration after intentional schema changes. `db:migrate` applies pending migrations explicitly; the application never resets the database or automatically applies DDL. `db:seed` refuses production mode.
 
-The daily counter includes only Active user experiments whose observation dates include today. Expired Active targets remain in the list with Finish / Keep observing rather than an unavailable Today task; a note explains the counter. A pending target decision suppresses the caught-up message. No 0/0 counter is shown. Dashboard’s existing workspace statistics remain separate from this user-only workflow.
+## Existing local data
 
-Storage is local to this browser profile and site origin. There is no account or cross-device synchronization. The application labels local storage and fictional samples. Clearing site data also removes locally saved observations.
+Open the same browser and origin that held your old experiments. When valid user experiments exist under `self-lab:experiments`, a **Move local experiments to this workspace** action appears. It imports only after you click it.
 
-## Interpretation
+Supported local versions 1–5 are decoded without changing the original browser value. IDs, dates, entries, custom definitions, lifecycle history, and known save/edit timestamps are preserved; unknown timestamps remain null. Fictional samples are excluded. The import is transactional and stores a receipt so the same backup is not imported repeatedly, even after server-side edits. Conflicting existing IDs reject the entire batch; they never overwrite server data.
 
-A missing check-in is **not** a not-done day. Missing scores are excluded separately for each metric. At least five scored observations in each group are required to show a percentage. The relative difference is `(done average - not-done average) / not-done average * 100`, calculated from unrounded means and displayed as a whole percentage. Missing, non-finite, or non-positive not-done averages produce no percentage. This describes average reported scores, not a percentage improvement in wellbeing.
-
-Absolute differences within half a scale point use the headline “No clear difference”; their relative difference remains secondary. Other relative differences below 10% are described as slightly higher or lower. Data labels use the smaller scored group: fewer than 5 is “Too early to compare”, 5–9 is “Early pattern”, and 10 or more is “Pattern worth noticing”. These are descriptive product rules, not statistical confidence or significance tests. Calculation details show means, scored counts, missing scores, missing days for completed experiments, and excluded observations when present.
-
-Subjective scores, small or unbalanced samples, selection effects, workload, weekends, and other circumstances limit interpretation. The app does not claim causation or use an AI API for conclusions.
-
-## Existing samples and migration
-
-The original three A/B sample experiments remain intact in `legacy-experiments.ts`. An explicit adapter preserves their scores, dates, IDs, notes, hypotheses, and conditions. Habit completion was not recorded, so migrated observations are marked **Not recorded** and excluded from done/not-done comparisons. Their original conditions remain available in the compact “Legacy experiment details” disclosure.
-
-One labelled fictional completed daily example demonstrates the comparison mode. The completed 28-day example has 13 done days, 8 not-done days, and 7 days without entries. Mood scores overlap between groups and show a higher reported average on done days; productivity has no clear difference. A sample-data cleanup replaces retired fictional examples identified by both stable IDs and `source: "sample"`. User-owned experiments are never removed, even with an old sample ID or title. Existing current-sample edits, empty workspaces, and user-only workspaces are preserved. Legacy fixtures remain available for compatibility tests, not seeded into the user workspace. These are not presented as the user's measurements. Supported version-one through version-four saved snapshots migrate to version five. Lifecycle is explicit: `status`, `completedAt`, and `targetExtensions`. Existing user experiments migrate to Active because no explicit finish decision was recorded; the known current completed sample migrates to Completed with an unknown (`null`) completion timestamp. Finishing now saves a real ISO timestamp; reopening clears it. Existing built-in metric IDs and score keys remain unchanged; metric ID arrays become definitions containing kind and numeric scale metadata. Older `date` fields become `observedDate`; unknown original save/edit timestamps remain `null`. New entries receive `recordedAt`; edits preserve that value and set `updatedAt`. Invalid or unsupported storage is reported and never silently replaced by samples.
+The browser copy remains an untouched backup. Corrupt/unsupported backups produce an explicit import error without blocking a healthy database workspace. Imports are limited to 100 experiments and a 2 MiB request; larger imports require a later explicit batching workflow. There is no browser-storage fallback after a failed server write.
 
 ## Architecture
 
 ```text
-src/
-  app/                              Existing routes and metadata
-  components/                       Shared layout, UI, and storage boundary
-  features/
-    dashboard/                      Existing dashboard presentation
-    experiments/
-      components/                   Creation, check-in, slider, charts, and results
-      context/                      Hydration, local clock, and serialized saves
-      data/                         Repository, migration, and preserved samples
-      model/                        Types, validation, actions, and pure analytics
-  i18n/                             Typed English dictionary and locale
-  lib/                              Calendar dates, formatting, and error mapping
-
-tests/                              Domain, repository, and migration tests
-  browser/                          Real Chrome regression scenario
+UI / ExperimentsProvider
+  → ExperimentsRepository
+  → HTTP adapter / Next.js Route Handlers
+  → server-only PostgreSQL repository
+  → Drizzle / pg / PostgreSQL
 ```
 
-Read [PRODUCT.md](docs/PRODUCT.md), [ARCHITECTURE.md](docs/ARCHITECTURE.md), and [AGENTS.md](AGENTS.md) for product boundaries and project rules. Supabase can replace the asynchronous repository without putting storage calls in UI or analytics. Authentication, database access, Vercel, AI APIs, and statistical models are not implemented in this stage.
+- `src/app/api`: validated, size-bounded API routes and sanitized error envelopes.
+- `src/server/db`: typed normalized schema and server-only connection pool.
+- `src/server/experiments`: scoped operations, transactions, and explicit domain mapping.
+- `src/features/experiments/model`: existing types, Zod rules, lifecycle, and analytics.
+- `src/features/experiments/data`: HTTP repository, explicit local import, legacy compatibility, and sample fixtures.
+- `src/features/experiments/context`: post-mount loading, serialized operations, local calendar clock, and confirmed server results.
+- `src/i18n`: typed English system copy; custom names remain user content.
+- `drizzle`: reviewed SQL migration and generated migration metadata.
+- `tests/integration`: real PostgreSQL repository tests.
+- `tests/browser`: real headless Chrome through CDP, HTTP API, and test PostgreSQL.
 
-## Checks
+The database uses separate experiments, metric definitions, daily entries, metric values, extension history, and import receipts. A physical UNIQUE constraint on experiment/date prevents duplicate check-ins. `observed_date` is SQL DATE, while save/edit/completion instants are timestamptz. SQL values are parameterized; database credentials and the driver stay on the server.
+
+See [ARCHITECTURE.md](docs/ARCHITECTURE.md), [PRODUCT.md](docs/PRODUCT.md), [AGENTS.md](AGENTS.md), and [third-party notices](THIRD_PARTY_NOTICES.md).
+
+## Quality checks
+
+Start both local services before database/browser tests:
 
 ```bash
+docker compose --profile test up -d --wait
 npm run format:check
 npm run lint
 npm run typecheck
 npm test
-npm run build
-```
-
-For the real browser regression test, build first and install Chrome if it is not already available:
-
-```bash
+npm run test:db
 npm run build
 npm run test:browser
+npm run test:browser:dev
 ```
 
-The browser test uses real headless Chrome through Chrome DevTools Protocol and the existing Node test runner, without another test dependency. By default it starts a production server on port 3101 and uses a separate temporary browser profile. Set `SELF_LAB_CHROME_PATH` or `SELF_LAB_TEST_PORT` if needed.
+Unit tests use Node's test runner with tsx. The PostgreSQL tests use a separate database whose name must end in `_test`; local hosts are required outside CI. Tests migrate that database, create random workspaces, and delete only their own rows, never development records.
 
-To exercise development behavior, including React Strict Mode and Next.js instant-navigation validation, start `npm run dev` in another terminal and run:
+Browser tests launch a real Chrome process with a temporary profile, send actual mouse/keyboard events, and start an isolated application server against a random workspace in the test database. Production mode uses port 3101 and requires the build first. Development mode starts its own `next dev --webpack` in the ignored `.next-browser` build directory, including Strict Mode and instant navigation validation. Do not point browser tests at your ordinary development workspace; the previous external-server option is no longer used.
 
-```bash
-SELF_LAB_TEST_BASE_URL=http://localhost:3000 npm run test:browser
-```
+The scenario checks creation/reload, a lost creation response with idempotent retry, empty metric validation, custom metric persistence, check-in/edit/reload without duplicates, dashboard counters, finish/results/reopen, explicit backup import, Today/Yesterday, expired-target extension, read-only samples, database save failure with retained input/retry, network retry, API validation, request-size/origin rejection, and mobile overflow. Direct queries confirm browser changes reached PostgreSQL. Console/runtime errors fail the test. Screenshot paths are printed. `SELF_LAB_CHROME_PATH` and `SELF_LAB_TEST_PORT` can override local executables/ports.
 
-With that variable set, the test connects to the existing server and does not start or stop it. Chrome always uses a separate temporary profile. The test starts with empty and sample-only onboarding, validates the question and metric requirement, creates a first experiment with built-in/custom metrics, reloads with zero automatic check-ins, bypasses onboarding for existing users, and edits an idea preset. It checks two Active experiments through 0/2 → 1/2 → caught-up, immediate updates without document reload, reload persistence, and editing today without duplicate entries. It sends actual mouse events to visible, unobscured buttons; it checks empty metric selection, custom metric creation/removal/duplicates and persistence, clicks both Dashboard check-in entrypoints and the details entrypoint, confirms the modal stays open after effects settle, saves today/yesterday observations, edits without duplication, and reloads the document. It also creates observations, finishes early, checks Active/Completed filters and dashboard counts, reloads the completed state, reopens without losing entries, extends an expired target using presets and custom days, and verifies failed lifecycle writes. It covers completed per-metric results after reload, collapsed observation tables on reload and after returning through client navigation, editing a completed observation without duplication, safe removal of retired fictional samples, repeated creation, fresh forms, failed writes, missing scores, a local date that differs from UTC, midnight during an open check-in, mobile layout, Escape, and invalid storage recovery. Console/runtime errors fail the test. Desktop/mobile/dialog screenshots are written to the temporary profile path printed by the test.
+GitHub Actions uses its own disposable PostgreSQL service and test-only credentials. It does not connect to a production database. A successful local run does not establish the status of a remote GitHub run.
 
-The original production-only test did open the details check-in and verify saving/reload, but did not exercise Dashboard check-in buttons or the development Strict Mode lifecycle. It could therefore miss the immediate-close regression.
+## Manual review
 
-## CI installation diagnosis
+1. Create an experiment with a built-in and custom metric; reload and check both persist.
+2. Save Done today and Not done yesterday when eligible. Leave a score unrated; it must stay missing. Edit a saved date and confirm only one entry remains.
+3. Create a second experiment: its blank form must be empty with no selected metrics. Check both Dashboard and Details entrypoints.
+4. Finish, inspect separate metric results, reload, and reopen. An elapsed target stays Active until explicitly finished.
+5. In the original browser, explicitly import local experiments; verify their dates, timestamps, custom metrics, and lifecycle. The original localStorage value must remain unchanged.
+6. Stop only the development database with `docker compose stop postgres`, try a save, and verify an error with retained input. Restart with `docker compose up -d --wait postgres` and retry. No success should be shown before the server confirms.
+7. Review at phone width; samples should be labelled fictional and offer no editing or lifecycle actions.
 
-The failed GitHub run stopped at `npm ci` with `EUSAGE`: the lockfile was missing `@emnapi/runtime@1.11.3` and `@emnapi/core@1.11.3`. npm 11.6.2 accepted the incomplete graph locally; npm 11.19.1 reproduced the exact failure. The corrected lockfile includes the missing optional peer and bundled entries without upgrading existing package versions.
+## Next stages
 
-The workflow still uses `npm ci` and retains formatting, lint, type, test, and build checks. Node is read from `.nvmrc`; runtime versions are printed for diagnosis. A local successful installation is not a claim that a new GitHub run has passed: that requires an authorized commit/push and a completed remote run.
-
-## Manual browser review
-
-1. In a separate browser profile, open Dashboard: enter a question, Continue, fill the name/habit, and select metrics. Try saving without metrics, then add a custom one and create. Details should offer Check in today with no automatic entries; reload and verify Dashboard now shows your experiment. Open New experiment, try an idea, edit its question/fields, and confirm subsequent blank forms are fresh.
-2. Create two experiments and open Dashboard. In Today’s check-ins, record one day and verify 1 of 2; record the second and verify the caught-up state. Reload, edit a today entry, and confirm no duplicate. Add yesterday appears only when eligible and disappears after saving that date. The existing focus/details dialogs still allow choosing Today or Yesterday.
-3. Edit the same date, reload, and confirm one updated entry remains.
-4. Check that a missing entry and a Not done entry produce different group counts.
-5. Open Completed → “Morning walks, mood, and productivity”: inspect separate Mood (+24%) and Productivity (“No clear difference”) cards, then expand “How was this calculated?” to inspect counts, averages, missing scores, formula, and limitations. Expand “View 21 daily observations”, edit a saved row, reload, and verify it remains a single edited row while the table starts collapsed.
-6. Verify All and Completed show one current fictional sample. Previously imported user-owned experiments retain their original scores and unclassified completion status.
-7. Finish a new experiment early, confirm the summary, reload, and reopen it. Check that counts and entries survive. On an expired target, try Keep observing → +7 / +14 / Custom, inspect the new target preview, and reload.
-8. Check narrow screens, keyboard sliders, radio controls, and closing the dialog with Escape.
-
-Third-party attribution remains in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). No new dependencies were required for this stage.
-
-Permanent deletion and archiving are roadmap items, not implemented. Extensions retain the existing maximum total target of 365 days; if the target has passed, added days start today. Early-finished results count only elapsed target days when reporting missing observations.
+Stage 8B: authentication, trusted user/workspace ownership, authorization, and the corresponding isolation tests. Future production infrastructure can use managed PostgreSQL. Hosting, account synchronization, archive/delete, additional scales, and additional experiment modes are not implemented. There is no Supabase integration.

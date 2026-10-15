@@ -49,7 +49,7 @@ Give each metric its own “What you observed” card. Calculate relative differ
 
 Differences within half a scale point have the primary headline “No clear difference”. Other relative differences below 10% use “Slightly higher/lower on done days”. Data strength uses the smaller scored group: fewer than 5 → “Too early to compare”, 5–9 → “Early pattern”, at least 10 → “Pattern worth noticing”. These describe data quantity, not statistical confidence. Calculation details explain averages, scored counts, missing scores, excluded observations, formula, and limitations. A calm ending supports pattern, similar, and insufficient outcomes without pressure.
 
-The only seeded example is the completed 28-day fictional daily experiment. It contains 13 done, 8 not-done, and 7 missing days with overlapping scores. Completed tables start collapsed and retain editing. Legacy conditions sit in a compact secondary disclosure, absent from new experiments. Small or unbalanced samples, self-reporting, selection effects, and confounding circumstances limit interpretation.
+The only read-only fixture is the completed 28-day fictional daily experiment. It contains 13 done, 8 not-done, and 7 missing days with overlapping scores. Completed user tables start collapsed and retain editing; fictional samples are read-only. Legacy conditions sit in a compact secondary disclosure, absent from new experiments. Small or unbalanced samples, self-reporting, selection effects, and confounding circumstances limit interpretation.
 
 A metric with one scored observation shows a point and an explanation rather than a trend line. Adjacent recorded days connect normally; dashed bridges cross days without recorded scores and never create observations or missing-day tooltips. Identical scores across metrics do not establish a relationship. Numeric scale metadata leaves room for later measurement types, but only 1–10 numeric scores are currently supported.
 
@@ -57,16 +57,18 @@ Rule-based summaries describe associations only. They never state that performin
 
 ## Storage and privacy
 
-This stage uses browser localStorage without an account or cross-device synchronization. Reads and writes may fail; show failures and keep unsaved input. Corrupt or unsupported saved data must not be silently overwritten. Historical samples and their original scales are preserved through a versioned adapter.
+Stage 8A stores user experiments in local PostgreSQL through a server-only API/repository boundary. It uses one shared development workspace with no authentication or private user ownership. Database/network failures must preserve input and never show false success.
+
+LocalStorage is now an untouched compatibility backup. Moving valid local user experiments requires explicit confirmation via the import action; samples are excluded. Import preserves IDs, dates, lifecycle, custom metrics, and known timestamps, rejects conflicting data atomically, and does not repeat the same backup. Corrupt local data is reported without replacing database content.
+
+Fictional examples remain labelled, read-only fixtures. They never become real database records.
 
 ## Future possibilities
 
-- Supabase persistence, authentication, user ownership, and row-level security.
-- Additional experiment modes, including scheduled A/B periods.
-- More contextual metrics and carefully explained descriptive comparisons.
-- Additional locales using the existing typed dictionary boundary.
-- Archive and permanent delete with an explicit data-retention design; neither is implemented now.
+- Stage 8B: authentication, authorized user/workspace ownership, and isolation tests.
+- Production infrastructure: managed PostgreSQL, server secrets, operational backups, and deployment hardening.
+- Additional experiment modes, more measurement types, descriptive comparisons, and locales.
+- Archive/permanent delete with a deliberate retention design; neither is implemented now.
+- Explicit import conflict resolution and batching for backups above current request bounds.
 
-These are roadmap items, not current features. Paid services, research-based recommendations, AI APIs, push notifications, and complex statistical models are out of scope.
-
-Retired fictional examples are cleaned up by stable ID and explicit sample origin. User-owned experiments are never deleted by this cleanup, including imports with matching IDs or titles. Legacy fixtures remain in migration tests.
+These are roadmap items, not current features. Hosting, AI APIs, push notifications, paid services, and complex statistical models are out of scope. No Supabase integration is planned.

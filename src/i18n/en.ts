@@ -14,8 +14,8 @@ export const en = {
     notDone: "Not done",
     notRecorded: "Not recorded",
     sample: "Sample data",
-    local: "Local only",
-    loading: "Loading your local workspace…",
+    local: "Development workspace",
+    loading: "Loading your workspace…",
     retry: "Retry loading",
     edit: "Edit",
     all: "All",
@@ -52,11 +52,11 @@ export const en = {
     discovery: "A little more self-discovery.",
     rhythm: "Your rhythm. Your observations.",
     next: "Your next step.",
-    profile: "Local workspace",
+    profile: "Development workspace",
     noAccount: "No account needed",
     caption: "A little lab for everyday life",
     curiosity: "Stay curious about yourself.",
-    storage: "Saved in this browser. No account or cross-device sync.",
+    storage: "Saved in PostgreSQL. Shared development workspace; no authentication yet.",
     initial: "L",
   },
   dashboard: {
@@ -80,7 +80,7 @@ export const en = {
     thanks: "Thanks for checking in. You can edit your entry if your assessment changes.",
     reflect: "Reflect on your day. Even ordinary days help you see the bigger picture.",
     today: "Today",
-    localNote: "Saved on this device",
+    localNote: "Saved in this workspace",
     trend: "The rhythm of your days",
     trendText: "Daily scores in your current experiment",
     better: "A BETTER EXPERIMENT",
@@ -110,7 +110,7 @@ export const en = {
     title: "My experiments",
     description: "Small changes that help you understand yourself.",
     filter: "Filter by status",
-    source: "Local workspace · includes fictional samples",
+    source: "Workspace · includes read-only fictional samples",
     empty: "No experiments here yet",
     emptyText: "Try another filter or start a new experiment.",
     advice:
@@ -119,7 +119,7 @@ export const en = {
     daily: "Daily habit comparison",
     compare: "Ready to compare",
     missing: "Experiment not found",
-    missingText: "Check the link and the browser you used to save this experiment.",
+    missingText: "Check the link and the workspace where you saved this experiment.",
     question: "YOUR QUESTION",
     habit: "YOUR HABIT",
     method: "COMPARISON METHOD",
@@ -154,7 +154,8 @@ export const en = {
     chartDays: "Experiment days",
     pointTitle: (label: string, value: number, day: number, max: number) =>
       `${label}: ${value} / ${max} · day ${day}`,
-    sampleNotice: "Fictional sample observations; not your measurements.",
+    sampleNotice:
+      "Read-only fictional sample; not your measurements. Create your own experiment to check in.",
   },
   form: {
     eyebrow: "A NEW EXPLORATION",
@@ -183,7 +184,7 @@ export const en = {
     metricsTitle: "What will you track?",
     metricsHelp: "Choose at least one metric. Daily scores are optional and stay on a 1–10 scale.",
     legend: "Experiment metrics",
-    local: "Stored in this browser, without an account or device sync.",
+    local: "Saved in the shared development workspace. Authentication is not implemented yet.",
     saving: "Creating…",
     adviceTitle: "Keep it simple",
     advice: "Change one thing at a time to make your observations easier to interpret.",
@@ -273,7 +274,7 @@ export const en = {
     check: "Check in",
     today: "Check in today",
     edit: "Edit check-in",
-    saved: "Check-in saved in this browser.",
+    saved: "Check-in saved in this workspace.",
     eyebrow: "DAILY OBSERVATION",
     title: "How was your day?",
     status: "Did you complete the habit?",
@@ -288,7 +289,7 @@ export const en = {
     scoresHelp: "Scores are optional. Unrated metrics are excluded from comparisons.",
     saving: "Saving…",
     save: "Save check-in",
-    local: "Saved only in this browser. No account or cross-device sync.",
+    local: "Saved in PostgreSQL in the shared development workspace.",
     notRated: "Not rated",
     clear: "Clear score",
     customLevels: [
@@ -378,17 +379,38 @@ export const en = {
     limits:
       "Subjective scores are approximate. Small or unbalanced samples, self-reporting, workload, weekends, and other circumstances limit interpretation. These observations do not establish causation or statistical significance.",
   },
+  importLocal: {
+    action: "Move local experiments to this workspace",
+    moving: "Moving…",
+    found: (count: number) =>
+      `${count} local ${count === 1 ? "experiment is" : "experiments are"} available to move.`,
+    backup:
+      "Only your experiments are moved. Fictional samples stay separate, and your browser copy remains as a backup.",
+    done: "Local experiments moved. Your browser backup is unchanged.",
+  },
   storage: {
-    loading: "Loading your local workspace…",
-    errorTitle: "Local storage needs attention",
-    errorHelp:
-      "Your saved data has not been replaced. Retry after checking this browser's storage settings.",
-    localLabel: "Browser storage",
+    loading: "Loading your workspace…",
+    errorTitle: "Workspace unavailable",
+    errorHelp: "Your local backup has not been changed. Check the server and database, then retry.",
+    localLabel: "Development workspace",
     sampleHelp:
-      "The workspace starts with clearly labelled fictional samples. Your new experiments and check-ins stay on this device.",
+      "Fictional samples are read-only. Your experiments and check-ins are saved in this shared development workspace.",
   },
   errors: {
     unexpected: "Something went wrong. Please try again.",
+    backendConfiguration:
+      "The workspace server needs configuration. Check the local setup and retry.",
+    serverUnavailable:
+      "The workspace server is unavailable. Your input is unchanged. Please retry.",
+    databaseUnavailable:
+      "The workspace database is unavailable. Your input is unchanged. Please retry.",
+    invalidRequest: "The request is invalid. Check your input and try again.",
+    payloadTooLarge: "This import is too large for one request. Your local backup is unchanged.",
+    dataConflict: "This request conflicts with saved data. Reload before trying again.",
+    importConflict:
+      "Some local IDs already exist with different data. Nothing from this import was changed; your local backup is safe.",
+    readOnlySample:
+      "This is a read-only sample. Create your own experiment to record observations.",
     completedEntry:
       "Reopen this experiment before adding a new observation. Existing observations can still be edited.",
     lifecycleState:
@@ -400,14 +422,14 @@ export const en = {
     futureEntry: "You cannot record a check-in for a future date.",
     outsideWindow: "This date is outside the experiment's observation window.",
     storageUnavailable:
-      "Browser storage is unavailable. Enable local storage to save your workspace.",
+      "Browser storage is unavailable. Enable local storage to read your old backup.",
     storageRead: "Could not read this browser's saved data.",
     storageWrite:
       "Could not save to this browser. Your previous data and current input are unchanged. Check available storage and try again.",
     storageCorrupt: "Saved browser data is invalid. It has not been overwritten.",
     storageVersion:
       "This saved workspace uses an unsupported version. It has not been overwritten.",
-    loading: "Wait for your local workspace to finish loading.",
+    loading: "Wait for your workspace to finish loading.",
     staleStorage:
       "The workspace changed in another tab. Reload before saving to avoid overwriting newer observations.",
   },

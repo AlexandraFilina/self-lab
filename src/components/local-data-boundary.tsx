@@ -1,5 +1,6 @@
 "use client";
 import { useExperiments } from "@/features/experiments/context/experiments-provider";
+import { LocalImportNotice } from "./local-import-notice";
 import { t } from "@/i18n";
 import { Button, Card } from "./ui";
 
@@ -27,6 +28,7 @@ export function LocalDataBoundary({ children }: { children: React.ReactNode }) {
           <p role="alert">{error}</p>
         </div>
       )}
+      <LocalImportNotice />
       {children}
     </>
   );

@@ -46,7 +46,7 @@ export function DailyEntryButton({
     withinWindow(targetDate) &&
     (existing || targetDate >= yesterday) &&
     (experiment.status === "active" || (row && existing));
-  if (!canCheckIn && !openDate) return null;
+  if (experiment.source === "sample" || (!canCheckIn && !openDate)) return null;
   return (
     <div className={className}>
       {canCheckIn && (

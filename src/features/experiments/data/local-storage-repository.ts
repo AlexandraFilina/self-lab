@@ -1,7 +1,7 @@
 import { AppError } from "@/lib/errors";
 import { workspaceSchema } from "../model/schemas";
 import type { Experiment } from "../model/types";
-import type { ExperimentsRepository } from "./repository";
+import type { WorkspaceSnapshotRepository } from "./repository";
 import { decodeWorkspace } from "./migration";
 
 export const STORAGE_KEY = "self-lab:experiments";
@@ -9,7 +9,7 @@ export interface StoragePort {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
 }
-export function createLocalStorageRepository(storage: StoragePort): ExperimentsRepository {
+export function createLocalStorageRepository(storage: StoragePort): WorkspaceSnapshotRepository {
   let lastRead: string | null | undefined;
   const read = () => {
     try {

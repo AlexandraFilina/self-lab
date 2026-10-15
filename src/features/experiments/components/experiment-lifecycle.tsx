@@ -29,12 +29,13 @@ export function ExperimentLifecycle({
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
   const progress = getProgress(experiment, referenceDate);
-  async function confirm(additionalDays?: number) {
+  async function confirm(additionalDays: number | undefined, requestId: string) {
     await changeLifecycle(
       experiment.id,
       action === "extend"
         ? { type: "extend", additionalDays: additionalDays ?? 0 }
         : { type: "finish" },
+      requestId,
     );
     setAction(null);
     if (action === "finish") router.push(`/experiments/${experiment.id}#results`);
@@ -49,6 +50,7 @@ export function ExperimentLifecycle({
       setError(errorMessage(cause));
     }
   }
+  if (experiment.source === "sample") return null;
   const content = (
     <>
       {experiment.status === "completed" ? (
@@ -137,10 +139,11 @@ function LifecycleDialog({
   action: DialogAction;
   experiment: Experiment;
   onDismiss: () => void;
-  onConfirm: (additionalDays?: number) => Promise<void>;
+  onConfirm: (additionalDays: number | undefined, requestId: string) => Promise<void>;
 }) {
   const { referenceDate } = useExperiments();
   const dialog = useRef<HTMLDialogElement>(null);
+  const requestId = useRef(crypto.randomUUID());
   const titleId = useId();
   const daysId = useId();
   const [option, setOption] = useState("7");
@@ -172,7 +175,7 @@ function LifecycleDialog({
     setError("");
     setSaving(true);
     try {
-      await onConfirm(action === "extend" ? additionalDays : undefined);
+      await onConfirm(action === "extend" ? additionalDays : undefined, requestId.current);
     } catch (cause) {
       setError(errorMessage(cause));
       setSaving(false);

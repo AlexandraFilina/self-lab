@@ -2464,3 +2464,12 @@ thead th {
 .lifecycle-inline .lifecycle-actions {
   margin-top: 10px;
 }
+
+.local-import-notice {
+  padding: 18px 24px;
+  margin-bottom: 24px;
+  font-size: 12px;
+}
+.local-import-notice .button {
+  margin-top: 12px;
+}

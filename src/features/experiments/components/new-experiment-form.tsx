@@ -23,6 +23,7 @@ export function NewExperimentForm({ onboarding = false }: { onboarding?: boolean
   const [fields, setFields] = useState(createEmptyExperimentDraft);
   const [selectedIdea, setSelectedIdea] = useState<string | null>(null);
   const sample = experiments.find((experiment) => experiment.source === "sample");
+  const creationId = useRef<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -54,6 +55,7 @@ export function NewExperimentForm({ onboarding = false }: { onboarding?: boolean
     }
   }
   const reset = useCallback(() => {
+    creationId.current = null;
     setStep("question");
     setFields(createEmptyExperimentDraft());
     setSelectedIdea(null);
@@ -112,7 +114,7 @@ export function NewExperimentForm({ onboarding = false }: { onboarding?: boolean
     setError("");
     setSaving(true);
     try {
-      const id = await createExperiment(result.data);
+      const id = await createExperiment(result.data, (creationId.current ??= crypto.randomUUID()));
       form.reset();
       router.push(`/experiments/${id}`);
     } catch (cause) {
