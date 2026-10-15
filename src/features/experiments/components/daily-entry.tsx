@@ -19,6 +19,7 @@ export function DailyEntryButton({
   date,
   row = false,
   variant = "primary",
+  label,
 }: {
   experiment: Experiment;
   className?: string;
@@ -26,6 +27,7 @@ export function DailyEntryButton({
   date?: string;
   row?: boolean;
   variant?: "primary" | "secondary" | "ghost";
+  label?: string;
 }) {
   const { referenceDate } = useExperiments();
   const [openDate, setOpenDate] = useState<string | null>(null),
@@ -57,13 +59,14 @@ export function DailyEntryButton({
           }}
         >
           <Icon name={existing ? "check" : "plus"} />
-          {row
-            ? t.common.edit
-            : existing
-              ? t.checkIn.edit
-              : compact || targetDate !== referenceDate
-                ? t.checkIn.check
-                : t.checkIn.today}
+          {label ??
+            (row
+              ? t.common.edit
+              : existing
+                ? t.checkIn.edit
+                : compact || targetDate !== referenceDate
+                  ? t.checkIn.check
+                  : t.checkIn.today)}
         </Button>
       )}
       {saved && (

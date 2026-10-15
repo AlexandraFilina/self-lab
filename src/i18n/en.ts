@@ -93,6 +93,18 @@ export const en = {
     empty: "Time for a new question",
     emptyText: "Start an experiment with one small change.",
   },
+  dailyWorkflow: {
+    title: "Today's check-ins",
+    pending: "Not checked in today",
+    checked: "Checked in today",
+    addYesterday: "Add yesterday",
+    summary: (count: number, total: number) => `${count} of ${total} checked in today`,
+    caughtUp: "You're caught up for today.",
+    caughtUpHelp: "Come back when you have something new to observe.",
+    targetSummary:
+      "Some experiments need a target decision. Today's count includes only experiments within their observation dates.",
+    notStarted: "The observation target starts later.",
+  },
   experiments: {
     eyebrow: "FROM QUESTION TO OBSERVATION",
     title: "My experiments",

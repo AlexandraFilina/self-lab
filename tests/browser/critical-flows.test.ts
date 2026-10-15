@@ -157,7 +157,7 @@ class Browser {
 }
 
 test(
-  "critical browser flows: onboarding, check-ins, results, lifecycle, reload, and responsive UI",
+  "critical browser flows: daily workflow, onboarding, results, lifecycle, and responsive UI",
   { timeout: 120000 },
   async () => {
     const executable = [
@@ -441,6 +441,102 @@ test(
       assert.equal(editedIdea.entries.length, 0);
       await navigate(`/experiments/${ideaId}`, "Edited idea experiment");
       assert.deepEqual(await userExperiment(ideaId), editedIdea);
+      await navigate("/dashboard", "Hello, curious mind");
+      const workflowDocument = await page.evaluate<string>("globalThis.__selfLabDocument");
+      assert.equal(await page.evaluate("globalThis.__qa('.daily-workflow-row').length"), 2);
+      assert.equal(
+        await page.evaluate("globalThis.__q('.daily-workflow-summary').textContent"),
+        "0 of 2 checked in today",
+      );
+      assert.equal(
+        await page.evaluate(
+          "globalThis.__qa('.daily-workflow-row button').filter(e=>e.textContent.trim()==='Add yesterday').length",
+        ),
+        0,
+      );
+      assert.equal(
+        await page.evaluate(
+          "globalThis.__qa('.daily-workflow-row[data-experiment-id=morning-walk-completed]').length",
+        ),
+        0,
+      );
+      await page.screenshot(join(profile, "daily-workflow-pending-desktop.png"));
+      await page.click("Check in", `.daily-workflow-row[data-experiment-id="${ideaId}"] button`);
+      await page.dialogOpen();
+      await page.evaluate("globalThis.__q('input[name=habitStatus][value=not_done]').click()");
+      await page.score("sleep", 6);
+      await page.fill("#entry-note", "First daily workflow observation");
+      await page.click("Save check-in");
+      await page.wait(
+        "!globalThis.__q('dialog')&&globalThis.__q('.daily-workflow-summary')?.textContent==='1 of 2 checked in today'",
+      );
+      assert.equal(await page.evaluate("globalThis.__selfLabDocument"), workflowDocument);
+      assert.equal(
+        await page.evaluate("globalThis.__q('.daily-workflow-row').dataset.experimentId"),
+        onboardingId,
+      );
+      assert.ok(
+        await page.evaluate(
+          `globalThis.__q('.daily-workflow-row[data-experiment-id="${ideaId}"]').textContent.includes('Checked in today')`,
+        ),
+      );
+      await page.click(
+        "Check in",
+        `.daily-workflow-row[data-experiment-id="${onboardingId}"] button`,
+      );
+      await page.dialogOpen();
+      await page.evaluate("globalThis.__q('input[name=habitStatus][value=done]').click()");
+      await page.score("sleep", 8);
+      await page.click("Save check-in");
+      await page.wait(
+        "!globalThis.__q('dialog')&&globalThis.__q('.daily-workflow-summary')?.textContent==='2 of 2 checked in today'",
+      );
+      assert.ok(
+        await page.evaluate(
+          "globalThis.__q('.daily-workflow-caught-up').textContent.includes(\"You're caught up for today.\")",
+        ),
+      );
+      assert.equal(await page.evaluate("globalThis.__selfLabDocument"), workflowDocument);
+      await navigate("/dashboard", "Hello, curious mind");
+      assert.equal(
+        await page.evaluate("globalThis.__q('.daily-workflow-summary').textContent"),
+        "2 of 2 checked in today",
+      );
+      assert.ok(await page.evaluate("!!globalThis.__q('.daily-workflow-caught-up')"));
+      const dailyBeforeEdit = (await userExperiment(ideaId)).entries[0];
+      await page.click("Edit", `.daily-workflow-row[data-experiment-id="${ideaId}"] button`);
+      await page.dialogOpen();
+      assert.equal(
+        await page.evaluate("globalThis.__q('#entry-note').value"),
+        "First daily workflow observation",
+      );
+      await page.score("sleep", 9);
+      await page.fill("#entry-note", "Edited daily workflow observation");
+      await page.click("Save check-in");
+      await page.wait("!globalThis.__q('dialog')");
+      const dailyAfterEdit = await userExperiment(ideaId);
+      assert.equal(dailyAfterEdit.entries.length, 1);
+      assert.equal(dailyAfterEdit.entries[0].id, dailyBeforeEdit.id);
+      assert.equal(dailyAfterEdit.entries[0].recordedAt, dailyBeforeEdit.recordedAt);
+      assert.ok(dailyAfterEdit.entries[0].updatedAt);
+      assert.equal(dailyAfterEdit.entries[0].values.sleep, 9);
+      await page.screenshot(join(profile, "daily-workflow-caught-up-desktop.png"));
+      await page.send("Emulation.setDeviceMetricsOverride", {
+        width: 390,
+        height: 844,
+        deviceScaleFactor: 1,
+        mobile: true,
+      });
+      assert.ok(await page.evaluate("document.documentElement.scrollWidth<=window.innerWidth"));
+      await page.evaluate("globalThis.__q('.daily-workflow').scrollIntoView({block:'center'})");
+      await page.screenshot(join(profile, "daily-workflow-mobile.png"));
+      await page.send("Emulation.setDeviceMetricsOverride", {
+        width: 1440,
+        height: 1100,
+        deviceScaleFactor: 1,
+        mobile: false,
+      });
+
       await page.evaluate(
         `localStorage.setItem('self-lab:experiments',${JSON.stringify(JSON.stringify(pristine))})`,
       );
@@ -485,14 +581,30 @@ test(
         `localStorage.setItem('self-lab:experiments',${JSON.stringify(JSON.stringify(withActive))})`,
       );
       await navigate("/dashboard", "Hello, curious mind");
+      assert.ok(
+        await page.evaluate(
+          "globalThis.__qa('.daily-workflow-row[data-experiment-id=browser-active] button').some(e=>e.textContent.trim()==='Add yesterday')",
+        ),
+      );
+      await page.click(
+        "Add yesterday",
+        ".daily-workflow-row[data-experiment-id=browser-active] button",
+      );
+      await page.dialogOpen();
+      assert.equal(await page.evaluate("globalThis.__q('dialog #entry-note').value"), "");
+      await page.click("Cancel", "dialog button");
+      await page.wait("!globalThis.__q('dialog')");
       for (const label of ["Check in", "Check in today"]) {
-        await page.click(label);
+        await page.click(
+          label,
+          label === "Check in" ? ".today-card button" : ".focus-footer button",
+        );
         await page.dialogOpen();
         await page.screenshot(join(profile, `dashboard-${label.replaceAll(" ", "-")}-dialog.png`));
         await page.click("Cancel");
         await page.wait("!globalThis.__q('dialog')");
       }
-      await page.click("Check in");
+      await page.click("Check in", ".today-card button");
       await page.dialogOpen();
       await page.click("Yesterday");
       await page.dialogOpen();
@@ -509,6 +621,12 @@ test(
       await page.wait("!globalThis.__q('dialog')");
       let sample = await userExperiment(sampleId);
       assert.equal(sample.entries.length, previousSample.entries.length + 1);
+      assert.equal(
+        await page.evaluate(
+          "globalThis.__qa('.daily-workflow-row[data-experiment-id=browser-active] button').some(e=>e.textContent.trim()==='Add yesterday')",
+        ),
+        false,
+      );
       const yesterdayEntry = sample.entries.find((entry) => entry.observedDate === yesterdayDate);
       assert.ok(yesterdayEntry);
       assert.equal(yesterdayEntry.habitStatus, "not_done");
@@ -983,6 +1101,12 @@ test(
       await navigate("/dashboard", "Hello, curious mind");
       assert.equal(
         await page.evaluate(
+          `globalThis.__qa('.daily-workflow-row[data-experiment-id="${secondId}"]').length`,
+        ),
+        0,
+      );
+      assert.equal(
+        await page.evaluate(
           "globalThis.__qa('.stat-value').map(e=>e.firstChild.textContent).join(',')",
         ),
         "2,23,2",
@@ -1021,6 +1145,18 @@ test(
         ),
       );
       assert.equal((await userExperiment(expired.id)).status, "active");
+      assert.ok(
+        await page.evaluate(
+          "globalThis.__q('.daily-workflow-row[data-experiment-id=browser-active] .lifecycle-inline').textContent.includes('Your observation window is complete')",
+        ),
+      );
+      assert.equal(
+        await page.evaluate(
+          "globalThis.__qa('.daily-workflow-row[data-experiment-id=browser-active] button').some(e=>e.textContent.trim()==='Check in')",
+        ),
+        false,
+      );
+
       await page.evaluate("globalThis.__q('.lifecycle-card').scrollIntoView({block:'center'})");
       await page.screenshot(join(profile, "observation-target-desktop.png"));
       await page.click("Keep observing");

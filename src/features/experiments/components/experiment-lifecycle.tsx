@@ -17,9 +17,11 @@ type DialogAction = "finish" | "extend";
 export function ExperimentLifecycle({
   experiment,
   compact = false,
+  inline = false,
 }: {
   experiment: Experiment;
   compact?: boolean;
+  inline?: boolean;
 }) {
   const { referenceDate, changeLifecycle, pending } = useExperiments();
   const router = useRouter();
@@ -56,8 +58,12 @@ export function ExperimentLifecycle({
       ) : progress.windowComplete && !compact ? (
         <>
           <h2>{t.lifecycle.windowComplete}</h2>
-          <p>{t.lifecycle.recorded(progress.recorded, progress.total)}</p>
-          <p className="muted">{t.lifecycle.targetPrompt}</p>
+          {!inline && (
+            <>
+              <p>{t.lifecycle.recorded(progress.recorded, progress.total)}</p>
+              <p className="muted">{t.lifecycle.targetPrompt}</p>
+            </>
+          )}
           <div className="lifecycle-actions">
             <Button
               disabled={pending}
@@ -113,10 +119,12 @@ export function ExperimentLifecycle({
       )}
     </>
   );
-  return progress.windowComplete && !progress.completed && !compact ? (
+  return progress.windowComplete && !progress.completed && !compact && !inline ? (
     <Card className="lifecycle-card">{content}</Card>
   ) : (
-    <div className="lifecycle-controls">{content}</div>
+    <div className={inline ? "lifecycle-controls lifecycle-inline" : "lifecycle-controls"}>
+      {content}
+    </div>
   );
 }
 

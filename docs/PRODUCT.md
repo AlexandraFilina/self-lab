@@ -23,6 +23,14 @@ The same New Experiment form handles onboarding and subsequent creation. First e
 
 Creation persists a user-owned Active experiment and navigates to Details with “Start observing today” and Check in. It never creates a check-in automatically. Onboarding needs no additional storage fields or migration.
 
+## Daily workflow
+
+Dashboard answers what to check in today with compact rows for all Active user-origin experiments. Samples and explicitly Completed experiments are excluded. Rows without today's entry come first; each group preserves the stored experiment order. A Done entry and a Not done entry are both real observations and display “Checked in today” with Edit. Successful saves update the shared provider state immediately.
+
+Add yesterday is a quiet secondary action only for a missing yesterday inside the observation target. There is no queue for older missing dates, no warning colors, and no guilt copy. Check in, Edit, and Add yesterday all reuse the existing date-specific check-in dialog and domain validation. Today and yesterday use the provider's local calendar date.
+
+The daily summary counts Active user experiments within today's observation dates. Expired targets remain visible with the existing Finish / Keep observing actions and an explanation of the counter; they are never silently completed or converted into unavailable Today tasks. A target decision prevents a misleading caught-up message. No 0/0 counter is displayed. Onboarding and the existing empty state remain available when there are no user experiments or no Active user experiments respectively.
+
 ## Experiment lifecycle
 
 Experiments have an explicit Active or Completed state. An elapsed target remains Active, with “Your observation window is complete”, recorded/target counts, “Finish & view results”, and “Keep observing”. Early finish is a secondary action and asks for confirmation with elapsed days, recorded observations, and Done / Not done counts. Finishing with sparse or no observations is allowed; results remain honest about insufficient data.

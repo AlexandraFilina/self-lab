@@ -2399,3 +2399,68 @@ thead th {
 .idea-grid [aria-pressed="true"] {
   border-color: var(--primary);
 }
+
+.daily-workflow {
+  padding: 24px;
+  margin-bottom: 24px;
+}
+.daily-workflow > .section-heading {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.daily-workflow h2 {
+  font-size: 16px;
+}
+.daily-workflow-summary,
+.daily-workflow-caught-up p {
+  font-size: 12px;
+  line-height: 1.8;
+}
+.daily-workflow-caught-up {
+  margin-top: 14px;
+}
+.daily-workflow-rows {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0 0;
+}
+.daily-workflow-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  padding: 16px 0;
+  border-top: 1px solid var(--border);
+}
+.daily-workflow-row:last-child {
+  padding-bottom: 0;
+}
+.daily-workflow-experiment {
+  flex: 1 1 210px;
+  min-width: 0;
+}
+.daily-workflow-experiment h3 {
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.daily-workflow-experiment p {
+  font-size: 11px;
+  margin-top: 4px;
+}
+.daily-workflow-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.daily-workflow-row .lifecycle-inline {
+  width: 100%;
+  margin: 0;
+}
+.lifecycle-inline h2 {
+  font-size: 12px;
+}
+.lifecycle-inline .lifecycle-actions {
+  margin-top: 10px;
+}

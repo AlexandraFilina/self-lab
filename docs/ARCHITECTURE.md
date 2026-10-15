@@ -66,6 +66,12 @@ The first submit validates `experimentQuestionSchema`, also used by the full dom
 
 The same successful creation produces a user-owned Active experiment with an empty entries array. Existing Details check-in controls provide the next step. Storage stays version 5; onboarding state is derived, so no extra storage or migration is introduced.
 
+## Dashboard daily workflow
+
+`features/dashboard/model/daily-workflow.ts` is a pure selector over experiments and a supplied local calendar date. It filters explicit Active/user origin, derives date-specific entry availability, partitions pending/checked rows without changing group order, and computes a summary for targets that include today. Expired Active targets remain rows with lifecycle actions; a separate flag explains counter eligibility and suppresses caught-up copy while a target decision is pending. Older absent dates never become tasks.
+
+`TodaysCheckIns` reads the shared provider and renders compact rows above the existing statistics. Its Check in/Edit/Add yesterday buttons pass an explicit date and localized label to `DailyEntryButton`; the form, validation, save/update semantics, and repository are unchanged. `ExperimentLifecycle` has an inline presentation for expired rows with the same commands and dialogs. The focused experiment is user-owned; fictional samples do not become daily tasks. Storage remains version 5 with no new migration or dependency.
+
 ## Native dialog lifecycle
 
 Check-in uses the existing native modal. Development Strict Mode replays effect setup/cleanup: showing, closing, and showing the dialog can queue a close event while it is open again. The close handler dismisses only if the dialog is currently closed. This preserves real Escape/close behavior without dismissing a reopened dialog. Selecting an observation day mounts the form for that date and loads only that date’s existing values.

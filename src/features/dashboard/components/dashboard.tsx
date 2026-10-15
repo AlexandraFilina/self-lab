@@ -6,6 +6,7 @@ import Link from "next/link";
 import { formatCount, formatDate } from "@/lib/format";
 import { endDate, getProgress, groupObservations } from "@/features/experiments/model/analytics";
 import { useExperiments } from "@/features/experiments/context/experiments-provider";
+import { TodaysCheckIns } from "./todays-check-ins";
 import { NewExperimentForm } from "@/features/experiments/components/new-experiment-form";
 import { needsOnboarding } from "@/features/experiments/model/onboarding";
 import { ExperimentLifecycle } from "@/features/experiments/components/experiment-lifecycle";
@@ -22,7 +23,7 @@ export function Dashboard() {
   const active = experiments.filter(
     (experiment) => !getProgress(experiment, referenceDate).completed,
   );
-  const current = active[0];
+  const current = active.find((experiment) => experiment.source === "user");
   const progress = current ? getProgress(current, referenceDate) : null;
   const groups = current ? groupObservations(current.entries) : null;
   const todayEntry = current?.entries.some((entry) => entry.observedDate === referenceDate);
@@ -67,6 +68,7 @@ export function Dashboard() {
           {formatDate(referenceDate, { day: "numeric", month: "long" })}
         </time>
       </div>
+      <TodaysCheckIns />
       <div className="stats-grid">
         {stats.map((stat) => (
           <Card key={stat.label} className="stat-card">
