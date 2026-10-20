@@ -10,7 +10,7 @@ import { authClient } from "../client";
 import { emailSchema, resetPasswordSchema, signInSchema, signUpSchema } from "../model/schemas";
 import { errorMessage } from "@/lib/errors";
 export type AuthMode = "sign-in" | "sign-up" | "forgot-password" | "reset-password";
-export function AuthForm({ mode }: { mode: AuthMode }) {
+export function AuthForm({ mode, mailAvailable }: { mode: AuthMode; mailAvailable: boolean }) {
   const ready = useClientReady();
   const params = useSearchParams();
   const [error, setError] = useState("");
@@ -71,7 +71,9 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
             : result.error.status >= 500
               ? t.auth.serviceError
               : signUp
-                ? t.auth.signUpError
+                ? mailAvailable
+                  ? t.auth.signUpError
+                  : t.auth.signUpErrorNoMail
                 : reset
                   ? t.auth.resetError
                   : forgot
@@ -110,7 +112,13 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
                 ? t.auth.resetCopy
                 : t.auth.signInCopy}
         </p>
-        {done ? (
+        {!mailAvailable && signUp && <p className="field-hint">{t.auth.mailUnavailableSignup}</p>}
+        {!mailAvailable && (forgot || reset) ? (
+          <div className="auth-result">
+            <p role="status">{t.auth.mailUnavailable}</p>
+            <Link href="/sign-in">{t.auth.backToSignIn}</Link>
+          </div>
+        ) : done ? (
           <div className="auth-result">
             <p role="status">{forgot ? t.auth.resetSent : t.auth.resetDone}</p>
             <Link href="/sign-in">{t.auth.backToSignIn}</Link>
@@ -205,7 +213,11 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
           <div className="auth-links">
             {mode === "sign-in" ? (
               <>
-                <Link href="/forgot-password">{t.auth.forgot}</Link>
+                {mailAvailable ? (
+                  <Link href="/forgot-password">{t.auth.forgot}</Link>
+                ) : (
+                  <span className="muted">{t.auth.mailUnavailableSignIn}</span>
+                )}
                 <Link href="/sign-up">{t.auth.createAccount}</Link>
               </>
             ) : (

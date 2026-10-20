@@ -40,9 +40,11 @@ export function SignOutButton({ compact = false }: { compact?: boolean }) {
 export function AccountControls({
   email,
   emailVerified,
+  mailAvailable,
 }: {
   email: string;
   emailVerified: boolean;
+  mailAvailable: boolean;
 }) {
   const ready = useClientReady();
   const [pending, setPending] = useState(false),
@@ -59,30 +61,32 @@ export function AccountControls({
       <p>{emailVerified ? t.auth.verified : t.auth.unverified}</p>
       {!emailVerified && (
         <>
-          <p className="field-hint">{t.auth.verifyHelp}</p>
-          <Button
-            variant="secondary"
-            disabled={!ready || pending}
-            onClick={async () => {
-              setPending(true);
-              setError("");
-              setFeedback("");
-              try {
-                const result = await authClient.sendVerificationEmail({
-                  email,
-                  callbackURL: "/account",
-                });
-                if (result.error) throw new Error("Verification failed");
-                setFeedback(t.auth.verificationSent);
-              } catch {
-                setError(t.auth.serviceError);
-              } finally {
-                setPending(false);
-              }
-            }}
-          >
-            {pending ? t.auth.sending : t.auth.resendVerification}
-          </Button>
+          <p className="field-hint">{mailAvailable ? t.auth.verifyHelp : t.auth.mailUnavailable}</p>
+          {mailAvailable && (
+            <Button
+              variant="secondary"
+              disabled={!ready || pending}
+              onClick={async () => {
+                setPending(true);
+                setError("");
+                setFeedback("");
+                try {
+                  const result = await authClient.sendVerificationEmail({
+                    email,
+                    callbackURL: "/account",
+                  });
+                  if (result.error) throw new Error("Verification failed");
+                  setFeedback(t.auth.verificationSent);
+                } catch {
+                  setError(t.auth.serviceError);
+                } finally {
+                  setPending(false);
+                }
+              }}
+            >
+              {pending ? t.auth.sending : t.auth.resendVerification}
+            </Button>
+          )}
         </>
       )}
       {feedback && <p role="status">{feedback}</p>}
@@ -91,9 +95,11 @@ export function AccountControls({
           {error}
         </p>
       )}
-      <div className="auth-links">
-        <Link href="/forgot-password">{t.auth.forgot}</Link>
-      </div>
+      {mailAvailable && (
+        <div className="auth-links">
+          <Link href="/forgot-password">{t.auth.forgot}</Link>
+        </div>
+      )}
       <SignOutButton />
     </Card>
   );

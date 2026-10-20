@@ -1,6 +1,13 @@
 import { Suspense, type ReactNode } from "react";
 import { requireAccount, redirectAuthenticated } from "@/server/auth/session";
 import { t } from "@/i18n";
+import { connection } from "next/server";
+import { localAuthMailAvailable } from "@/server/auth/mail";
+import { AuthForm, type AuthMode } from "./auth-form";
+export async function AuthFormWithMail({ mode }: { mode: AuthMode }) {
+  await connection();
+  return <AuthForm mode={mode} mailAvailable={localAuthMailAvailable()} />;
+}
 async function RequireSession({ children }: { children: ReactNode }) {
   await requireAccount();
   return children;

@@ -57,7 +57,7 @@ Rule-based summaries describe associations only. They never state that performin
 
 ## Storage and privacy
 
-Stage 8B stores each account’s experiments in an owned personal PostgreSQL workspace through authenticated server boundaries. Email/password registration, login, logout, and fixed-expiry persistent sessions are implemented. New accounts start with the existing empty onboarding; no experiment is created automatically. Database/network failures must preserve input and never show false success.
+Stage 8B stores each account’s experiments in an owned personal PostgreSQL workspace through authenticated server boundaries. Stage 9A prepares the same experience for Vercel with managed Neon PostgreSQL; a live deployment still requires the dashboard setup in README. Email/password registration, login, logout, and fixed-expiry persistent sessions are implemented. New accounts start with the existing empty onboarding; no experiment is created automatically. Database/network failures must preserve input and never show false success.
 
 LocalStorage is now an untouched compatibility backup. Moving valid local user experiments requires explicit confirmation via the import action; samples are excluded. Import preserves IDs, dates, lifecycle, custom metrics, and known timestamps, rejects conflicting data atomically, and does not repeat the same backup. Corrupt local data is reported without replacing database content.
 
@@ -65,13 +65,12 @@ Fictional examples remain labelled, read-only fixtures. They never become real d
 
 ## Future possibilities
 
-- Stage 9 production: deployment, production email delivery, verification policy, trusted proxy/abuse configuration, and operations.
-- Production infrastructure: managed PostgreSQL, server secrets, operational backups, and deployment hardening.
+- Stage 9B: production email delivery, verification policy, trusted proxy/abuse configuration, monitoring, and backup/restore operations.
 - Additional experiment modes, more measurement types, descriptive comparisons, and locales.
 - Archive/permanent delete with a deliberate retention design; neither is implemented now.
 - Explicit import conflict resolution and batching for backups above current request bounds.
 
-These are roadmap items, not current features. Hosting, AI APIs, push notifications, paid services, and complex statistical models are out of scope. No Supabase integration is planned.
+These are roadmap items, not current features. Stage 9A prepares hosting but does not itself create a live Vercel or Neon project. AI APIs, push notifications, payments, and complex statistical models are out of scope. No Supabase integration is planned.
 
 ## Account access and local email
 
@@ -80,3 +79,5 @@ Sign-up requires email, a 12–128-character password, and confirmation. Sign-in
 Forgot-password always confirms generically. Reset links expire in 15 minutes and are single-use; a successful reset revokes all previous sessions. Verification links expire in an hour. Development mail stays in local Mailpit; the application never displays tokens. Unverified accounts can continue local development. Production mail delivery and verification enforcement policy remain Stage 9.
 
 Local import is offered only after sign-in and always targets the current account. The original backup remains unchanged. Changing accounts clears retained client state through full navigation. Stage 8A unowned development records are not assigned to new accounts.
+
+In local development, Mailpit captures reset and verification messages. On a production deployment without an email provider, signup/sign-in still work, but the UI states that reset and verification are unavailable; the corresponding API calls return a safe unavailable response. Users must retain their password until Stage 9B provides real mail delivery and a reviewed verification policy.

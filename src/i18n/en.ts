@@ -22,8 +22,14 @@ export const en = {
     signInError: "Email or password is incorrect.",
     signUpError:
       "Could not create an account with those details. Try signing in or resetting your password.",
+    signUpErrorNoMail: "Could not create an account with those details. Try signing in.",
     serviceError: "The account service is unavailable. Your input is unchanged. Please try again.",
     rateLimited: "Too many attempts. Please wait a little and try again.",
+    mailUnavailable:
+      "Email delivery is unavailable on this deployment. Password reset and email verification are paused.",
+    mailUnavailableSignup:
+      "Email verification and password reset are unavailable here. Keep your password safe.",
+    mailUnavailableSignIn: "Password reset by email is unavailable here.",
     forgot: "Forgot password?",
     forgotTitle: "Reset your password",
     forgotCopy: "Enter your email and we’ll help you get back to your observations.",

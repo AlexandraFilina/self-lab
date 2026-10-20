@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { t } from "@/i18n";
 import { Suspense } from "react";
-import { AuthForm } from "@/features/auth/components/auth-form";
+import { AuthFormWithMail } from "@/features/auth/components/server-boundary";
 export const metadata: Metadata = { title: t.auth.forgotTitle, referrer: "no-referrer" };
 export default function Page() {
   return (
     <Suspense>
-      <AuthForm mode="forgot-password" />
+      <AuthFormWithMail mode="forgot-password" />
     </Suspense>
   );
 }

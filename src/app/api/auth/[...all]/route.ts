@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import { authResponse } from "@/server/auth/response";
 import { getAuth } from "@/server/auth";
+import { localAuthMailAvailable } from "@/server/auth/mail";
 import { readJson, assertSameOrigin } from "@/server/request";
 import { emailSchema, passwordSchema } from "@/features/auth/model/schemas";
 import { z, ZodError } from "zod";
@@ -24,6 +25,14 @@ async function handle(request: Request) {
   if (!allowed) return Response.json({ code: "NOT_FOUND" }, { status: 404 });
   try {
     assertSameOrigin(request);
+    if (
+      !localAuthMailAvailable() &&
+      ["request-password-reset", "send-verification-email"].includes(path)
+    )
+      return Response.json(
+        { code: "AUTH_MAIL_UNAVAILABLE" },
+        { status: 503, headers: { "Cache-Control": "no-store" } },
+      );
     let forwarded = request;
     if (request.method === "POST") {
       const input =

@@ -9,9 +9,10 @@ import { t } from "@/i18n";
 
 export function createAuth(
   db: Database,
-  config: { secret: string; baseURL: string; sendMail?: SendAuthMail },
+  config: { secret: string; baseURL: string; sendMail?: SendAuthMail; mailEnabled?: boolean },
 ) {
   const sendMail = config.sendMail ?? sendLocalAuthMail;
+  const mailEnabled = config.mailEnabled ?? true;
   // The library generates, hashes, signs, stores, expires and revokes all auth credentials.
   return betterAuth({
     appName: "Self Lab",
@@ -28,24 +29,28 @@ export function createAuth(
       requireEmailVerification: false,
       revokeSessionsOnPasswordReset: true,
       resetPasswordTokenExpiresIn: 15 * 60,
-      sendResetPassword: async ({ user, url }) => {
-        await sendMail({
-          to: user.email,
-          subject: t.authMail.resetSubject,
-          text: t.authMail.resetBody(url),
-        });
-      },
+      sendResetPassword: mailEnabled
+        ? async ({ user, url }) => {
+            await sendMail({
+              to: user.email,
+              subject: t.authMail.resetSubject,
+              text: t.authMail.resetBody(url),
+            });
+          }
+        : undefined,
     },
     emailVerification: {
-      sendOnSignUp: true,
+      sendOnSignUp: mailEnabled,
       expiresIn: 60 * 60,
-      sendVerificationEmail: async ({ user, url }) => {
-        await sendMail({
-          to: user.email,
-          subject: t.authMail.verifySubject,
-          text: t.authMail.verifyBody(url),
-        });
-      },
+      sendVerificationEmail: mailEnabled
+        ? async ({ user, url }) => {
+            await sendMail({
+              to: user.email,
+              subject: t.authMail.verifySubject,
+              text: t.authMail.verifyBody(url),
+            });
+          }
+        : undefined,
     },
     session: {
       expiresIn: 60 * 60 * 24 * 7,

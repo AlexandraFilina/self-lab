@@ -10,7 +10,7 @@ The existing Next.js App Router application keeps its visual system and feature-
 - `src/features/experiments/components`: creation, check-in, metric selection, saved entries, and comparison presentation.
 - `src/features/dashboard`: the existing dashboard presentation using the same experiment source.
 - `src/i18n`: one real English dictionary, typed access, and locale-aware formatting. No language switcher or fictional translations.
-- `src/app/api`: Next.js Route Handlers using the default Node.js runtime.
+- `src/app/api`: Next.js Route Handlers using the default Node.js runtime, including database-backed `/api/health`.
 - `src/server`: server-only pool, scoped PostgreSQL repository, normalized schema, and mapper.
 - `drizzle`: versioned SQL migrations and generated metadata.
 - `scripts`: explicit migration, workspace seed, and database health commands.
@@ -136,9 +136,17 @@ The root layout contains HTML/body only. A workspace route group retains the exi
 
 `authenticatedRepository` derives user ID exclusively from Better Auth's validated session, resolves that owner's personal workspace, and constructs the existing workspace-scoped repository. All list/get/create/entry/lifecycle/import/receipt operations inherit that scope. Import body schemas reject workspace/user selectors. Identical imported public IDs in two accounts are separate internal database rows; neither changes the other. Import receipts are per-workspace, and local backups remain untouched.
 
-Local SMTP uses Nodemailer with loopback-only Mailpit. Password reset always presents generic dictionary confirmation. Library background tasks dispatch mail without putting SMTP response time into the request path; local failures have a fixed diagnostic, not raw mail/token logs. The account screen offers verification status/resend. Verification does not block local signup/login; production policy remains Stage 9. Reset and verification tokens are passed only through library email flows, never embedded in account UI.
+Local SMTP uses Nodemailer with loopback-only Mailpit and a loopback auth origin. Password reset presents generic dictionary confirmation only when mail delivery is configured. Library background tasks dispatch local mail without putting SMTP response time into the request path; local failures have a fixed diagnostic, not raw mail/token logs. The account screen offers verification status/resend locally. Verification does not block signup/login; production enforcement policy remains Stage 9B. Reset and verification tokens are passed only through library email flows, never embedded in account UI. When mail is unavailable, signup creates no verification mail task, reset/resend return `AUTH_MAIL_UNAVAILABLE`, and the UI describes this limitation.
 
-Stage 9 production work: real email transport, durable background dispatch, verification enforcement policy, trusted proxy/IP and abuse controls, operational retention/cleanup, deployment, managed PostgreSQL, TLS/secrets/backups/monitoring. The in-process background task handler is for this long-running local Node environment; it is not a durable production mail queue. OAuth and shared/team workspaces remain unimplemented.
+## Production infrastructure (Stage 9A)
+
+Vercel hosts the existing Next.js 16 App Router/Route Handlers without an adapter or `vercel.json`. Node 24 is pinned. The runtime `DATABASE_URL` is Neon's pooled PostgreSQL URL with `sslmode=verify-full`; `BETTER_AUTH_URL` is the canonical HTTPS deployment origin; `BETTER_AUTH_SECRET` stays server-only and stable. The auth configuration trusts only that base origin, uses Secure/HttpOnly/SameSite=Lax cookies and fixed database sessions. Invalid production URL/TLS configuration fails closed. Localhost and Mailpit cannot be selected as Vercel mail destinations. Preview deployments need isolated credentials, database, and matching auth URL; production values are scoped to Production only.
+
+One lazy process-level `pg` pool is reused per function instance. On Vercel it is capped at two clients, omits `options` and `statement_timeout` startup parameters that a PgBouncer transaction pooler may reject, closes idle clients quickly, and uses `attachDatabasePool` before functions suspend. Neon pooling prevents each serverless instance from reserving a dedicated PostgreSQL backend connection. This does not guarantee a global connection cap across arbitrary function concurrency; monitor usage as traffic grows. The separate `MIGRATION_DATABASE_URL` uses Neon's direct hostname with TLS verification in a short-lived operator process. `db:migrate` applies only checked-in Drizzle migrations; remote migrations require that explicit direct URL. Build/startup never runs DDL or seed. The health endpoint executes `SELECT 1` at request time and returns only `ok` or HTTP 503 `unavailable`, without error details.
+
+Stage 9A has no production mail transport. Production signup works without an email task; password reset and verification are unavailable with explicit UI and a safe API error. The local in-process mail handler remains only for Mailpit and is not a durable queue. Neon Free's short instant restore window is not a long-term backup; before storing irreplaceable data, arrange a suitable backup and test a restore. A live Vercel/Neon deployment requires external account/dashboard setup and smoke testing as documented in README.
+
+Stage 9B remains: real email transport, durable dispatch, verification enforcement policy, trusted proxy/IP and abuse controls, monitoring, backup retention/restore practice, and operational retention/cleanup. OAuth and shared/team workspaces remain unimplemented.
 
 ## Tests and CI
 
