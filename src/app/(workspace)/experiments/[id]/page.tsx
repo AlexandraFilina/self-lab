@@ -1,3 +1,4 @@
+import { requireAccount } from "@/server/auth/session";
 import { LocalDataBoundary } from "@/components/local-data-boundary";
 import { t } from "@/i18n";
 import type { Metadata } from "next";
@@ -10,6 +11,7 @@ export function generateStaticParams() {
   return SAMPLE_EXPERIMENT_IDS.map((id) => ({ id }));
 }
 async function ExperimentRoute({ params }: { params: Promise<{ id: string }> }) {
+  await requireAccount();
   const { id } = await params;
   return (
     <LocalDataBoundary>

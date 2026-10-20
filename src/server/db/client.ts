@@ -21,7 +21,6 @@ const globalDatabase = globalThis as typeof globalThis & {
   selfLabDatabase?: ReturnType<typeof openDatabase>;
 };
 export function getDatabase() {
-  if (!process.env.DATABASE_URL || process.env.SELF_LAB_ALLOW_ANONYMOUS_WORKSPACE !== "true")
-    throw new AppError("backendConfiguration");
+  if (!process.env.DATABASE_URL) throw new AppError("backendConfiguration");
   return (globalDatabase.selfLabDatabase ??= openDatabase(process.env.DATABASE_URL)).db;
 }

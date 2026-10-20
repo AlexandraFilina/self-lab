@@ -2473,3 +2473,77 @@ thead th {
 .local-import-notice .button {
   margin-top: 12px;
 }
+
+.auth-page {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  gap: 28px;
+}
+.auth-brand {
+  align-self: center;
+}
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+  padding: 32px;
+}
+.auth-card h1 {
+  font-size: 28px;
+  line-height: 1.25;
+  margin-bottom: 12px;
+}
+.auth-card form {
+  display: grid;
+  gap: 20px;
+  margin-top: 28px;
+}
+.auth-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 24px;
+  font-size: 13px;
+}
+.auth-links a,
+.auth-result a {
+  color: var(--primary);
+}
+.auth-result {
+  display: grid;
+  gap: 20px;
+  margin-top: 24px;
+}
+.auth-caption {
+  text-align: center;
+  font-size: 12px;
+}
+.account-card {
+  max-width: 580px;
+}
+.account-card dl {
+  margin: 28px 0 16px;
+}
+.account-card dd {
+  margin: 8px 0;
+  overflow-wrap: anywhere;
+}
+.account-sign-out {
+  display: inline-flex;
+  flex-wrap: wrap;
+}
+.demo-profile .account-sign-out button {
+  padding: 4px;
+  font-size: 11px;
+}
+@media (max-width: 600px) {
+  .auth-card {
+    padding: 24px;
+  }
+  .auth-card h1 {
+    font-size: 25px;
+  }
+}

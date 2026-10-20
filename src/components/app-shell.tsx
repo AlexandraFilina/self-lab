@@ -1,5 +1,6 @@
 "use client";
 
+import { SignOutButton } from "@/features/auth/components/account-controls";
 import { t } from "@/i18n";
 
 import Link from "next/link";
@@ -72,20 +73,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="demo-profile">
             <span className="avatar">{t.shell.initial}</span>
             <span>
-              <strong>{t.shell.profile}</strong>
+              <strong>
+                <Link href="/account">{t.auth.account}</Link>
+              </strong>
               <small>{t.shell.noAccount}</small>
             </span>
-            <span className="profile-dot" />
+            <SignOutButton compact />
           </div>
         </div>
       </aside>
       <div className="main-shell">
         <header className="topbar">
           <span className="topbar-caption">{t.shell.caption}</span>
-          <span className="demo-badge">
+          <Link href="/account" className="demo-badge" aria-label={t.auth.account}>
             <span />
             {t.common.local}
-          </span>
+          </Link>
         </header>
         <main id="main-content" className="main-content">
           {children}

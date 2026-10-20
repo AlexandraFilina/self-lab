@@ -1,4 +1,6 @@
 import { sql } from "drizzle-orm";
+import { authUsers } from "./auth-schema";
+export * from "./auth-schema";
 import {
   pgTable,
   uuid,
@@ -13,15 +15,33 @@ import {
   check,
   foreignKey,
   index,
+  text,
+  boolean,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import type { LegacyExperiment } from "@/features/experiments/model/types";
 const instant = (name: string) =>
   timestamp(name, { withTimezone: true, mode: "string", precision: 6 });
-export const workspaces = pgTable("workspaces", {
-  id: uuid("id").primaryKey(),
-  name: varchar("name", { length: 120 }).notNull(),
-  createdAt: instant("created_at").defaultNow().notNull(),
-});
+export const workspaces = pgTable(
+  "workspaces",
+  {
+    id: uuid("id").primaryKey(),
+    name: varchar("name", { length: 120 }).notNull(),
+    ownerUserId: text("owner_user_id").references(() => authUsers.id, { onDelete: "restrict" }),
+    isPersonal: boolean("is_personal").notNull().default(false),
+    createdAt: instant("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("workspace_personal_owner")
+      .on(table.ownerUserId)
+      .where(sql`${table.isPersonal} = true`),
+    index("workspace_owner").on(table.ownerUserId),
+    check(
+      "workspace_personal_requires_owner",
+      sql`not ${table.isPersonal} or ${table.ownerUserId} is not null`,
+    ),
+  ],
+);
 export const experiments = pgTable(
   "experiments",
   {

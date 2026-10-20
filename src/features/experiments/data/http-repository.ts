@@ -20,6 +20,8 @@ export function createHttpRepository(): ExperimentsRepository {
     } catch {
       throw new AppError("serverUnavailable");
     }
+    if (response.status === 401 && typeof window !== "undefined")
+      window.location.replace("/sign-in");
     const envelope = z
       .object({ data: z.unknown().optional(), error: z.object({ code: z.unknown() }).optional() })
       .safeParse(await response.json().catch(() => null));

@@ -56,7 +56,8 @@ The existing half-point similarity rule suppresses directional headlines for sma
 
 ```text
 Next.js client UI → ExperimentsRepository → HTTP adapter
-  → Route Handler → PostgreSQL repository → Drizzle / pg → PostgreSQL
+  → Route Handler → Better Auth session → owned personal workspace
+  → PostgreSQL repository → Drizzle / pg → PostgreSQL
 ```
 
 Route Handlers preserve the existing client provider/forms without introducing a second mutation framework. Neither UI nor analytics imports SQL or a database client. DB connection and repository modules import `server-only`; no credentials use the NEXT_PUBLIC prefix. A lazy process-level pool permits building without a live database. Development E2E selects an isolated `.next-browser` build directory so it can run alongside the user's ordinary dev server. The existing Cache Components/Partial Prefetching settings are unchanged; `connection()` opts API reads into request-time execution, outside error handling so Next prerender signals are not swallowed. Explicit route-level runtime declarations are incompatible with this installed Next version's Cache Components; Node.js is already the default.
@@ -67,7 +68,7 @@ Reads use repeatable-read read-only transactions. Entry and lifecycle writes loc
 
 ### Normalized schema and constraints
 
-- `workspaces`: UUID, display name, creation instant. No user identity yet.
+- `workspaces`: UUID, name, creation instant, nullable owner_user_id FK to auth_users, is_personal flag. A partial unique index allows one personal workspace per owner while allowing additional workspaces later. Unowned Stage 8A data is never assigned automatically.
 - `experiments`: internal UUID, preserved public ID, workspace FK, daily-habit question/habit/title, explicit lifecycle, start DATE, target duration, completion/save timestamps. UNIQUE(workspace, public ID).
 - `experiment_metrics`: internal UUID, experiment FK, stable domain metric ID, nullable custom label, kind, scale metadata, position. Unique stable ID and position within the experiment.
 - `daily_entries`: internal UUID, preserved public ID, experiment FK, observed DATE, explicit or legacy-null status, note, save/edit instants, origin. UNIQUE(experiment, observed DATE) and UNIQUE(experiment, public ID).
@@ -95,7 +96,7 @@ The provider always renders layout children, both before and after its post-moun
 
 Mutation requests validate same-origin headers when present, reject cross-site Fetch Metadata, and use no permissive CORS. This is CSRF hardening, not authentication or an authorization boundary. Routes enforce JSON and a streamed 2 MiB limit, Zod bounds, supported time zones, and source:user imports (max 100 experiments). SQL inputs are parameterized through Drizzle. API errors expose stable codes only, not SQL, credentials, or server stack traces.
 
-The anonymous workspace must be explicitly enabled with server-only environment settings; every query is scoped to that workspace. All visitors to this local server share it. It is not a private account or production security model. The database binds only to loopback in Compose. No reset runs on startup. Apply reviewed migrations explicitly; workspace seed is idempotent and development-only.
+Every application request resolves its personal workspace from a database-validated Better Auth session. No user/workspace identifier from a request body is trusted. Missing and foreign experiment IDs use the same safe 404. The old anonymous workspace flags no longer select application data. The database binds only to loopback in Compose. No reset runs on startup. Apply reviewed migrations explicitly; workspace seed is idempotent and development-only.
 
 ## Form lifecycle
 
@@ -121,16 +122,28 @@ Check-in uses the existing native modal. Development Strict Mode replays effect 
 
 Archive and permanent delete remain roadmap work; no destructive controls are implemented.
 
-## Stage 8B and production
+## Authentication and ownership (Stage 8B)
 
-Authentication and user/workspace ownership are not implemented. Stage 8B must replace the environment-selected shared workspace with a trusted authenticated identity, authorize every read/write/import, and add cross-user isolation tests. Repository operations already accept a server-side workspace scope; ownership must never come from an untrusted client field. Keep pure domain validation, analytics, stable metric IDs, form components, normalized schema, and mapping.
+Better Auth 1.7.8 with its Drizzle adapter implements email/password hashing, database sessions, signed HttpOnly cookies, reset tokens, and signed verification tokens. Auth schema imports server-only; the generation script runs with the react-server condition so the CLI can read guarded tables. Tables: auth_users, auth_accounts, auth_sessions, auth_verifications, auth_rate_limits. User email has a case-insensitive unique index. User-owned workspaces reference auth_users with RESTRICT; session/account rows cascade on user deletion. No deletion endpoint is exposed.
 
-Future production can use managed PostgreSQL with production pool/TLS policy, managed secrets, backups, migrations, monitoring, deployment hardening, and a deliberate retention policy. No managed service or hosting is configured in Stage 8A.
+`createAuth` configures transactions, fixed seven-day sessions, no cookie cache, SameSite=Lax, production Secure cookies, 15-minute single-use reset, reset session revocation, one-hour verification, and built-in database-backed IP/path rate limits. Library logging is disabled; application diagnostics never print credentials or mail links. Shared Zod schemas normalize email, preserve password whitespace, and validate the 12–128-character signup/reset rule plus confirmation. A generic internal name satisfies the library without an extra required UI field.
+
+`/api/auth/[...all]` exposes only the implemented endpoint allowlist. It validates origin/body bounds, normalizes email, and delegates crypto/state operations to Better Auth. The response helper keeps library redirects and cookies intact, removes duplicate JSON session tokens, and hides raw errors. The normal JSON get-session endpoint is not public; server session reads use the library API. `/api/account` exposes only email and verification status.
+
+Signup's library transaction creates auth records; its queued post-transaction user-create hook provisions an owned personal workspace idempotently. Workspace creation is a follow-up, not atomic with auth signup; an authenticated repository request retries provisioning if necessary. A unique partial index prevents races from creating two personal workspaces. It never claims an old unowned workspace.
+
+The root layout contains HTML/body only. A workspace route group retains the existing provider/shell. Each private page checks the session on the server inside Suspense, never by awaiting auth above layout children. Session helpers call connection() before the library reads the clock, explicitly excluding session validation from prerendering. Auth form server markup uses POST with inputs/submit disabled until hydration attaches client handlers. Sensitive auth callback/token URLs are excluded only from incoming request logs; framework warnings remain enabled. APIs authorize independently on every operation. Auth pages redirect already signed-in users. Full navigation on sign-in/out clears preserved client route/provider state across accounts, and an API 401 sends the browser to sign-in. No identity is stored or trusted in localStorage.
+
+`authenticatedRepository` derives user ID exclusively from Better Auth's validated session, resolves that owner's personal workspace, and constructs the existing workspace-scoped repository. All list/get/create/entry/lifecycle/import/receipt operations inherit that scope. Import body schemas reject workspace/user selectors. Identical imported public IDs in two accounts are separate internal database rows; neither changes the other. Import receipts are per-workspace, and local backups remain untouched.
+
+Local SMTP uses Nodemailer with loopback-only Mailpit. Password reset always presents generic dictionary confirmation. Library background tasks dispatch mail without putting SMTP response time into the request path; local failures have a fixed diagnostic, not raw mail/token logs. The account screen offers verification status/resend. Verification does not block local signup/login; production policy remains Stage 9. Reset and verification tokens are passed only through library email flows, never embedded in account UI.
+
+Stage 9 production work: real email transport, durable background dispatch, verification enforcement policy, trusted proxy/IP and abuse controls, operational retention/cleanup, deployment, managed PostgreSQL, TLS/secrets/backups/monitoring. The in-process background task handler is for this long-running local Node environment; it is not a durable production mail queue. OAuth and shared/team workspaces remain unimplemented.
 
 ## Tests and CI
 
 Node/tsx unit tests preserve existing pure domain, migration, legacy repository, chart, result, onboarding, and daily workflow coverage. New local-import tests verify backup reads never write and validate API/date contracts. Real PostgreSQL integration tests apply the checked-in migration in a guarded test database and use random workspaces. They verify normalization, SQL-like input safety, custom scores, missing scores, unique constraints, concurrency, lifecycle, extension retry, transaction rollback, legacy/import preservation, import conflicts/receipts, and FK isolation.
 
-Browser tests use actual Chrome/CDP input and a fresh profile, run their own production or development Next server, and select a random workspace in the test PostgreSQL database. Domain fixtures are arranged only inside that test scope; browser actions go through HTTP and are checked with independent PostgreSQL queries. See README for exact commands and coverage. No API test-reset endpoint exists. Test cleanup deletes only that run's workspace rows; no global truncate/drop/reset script exists.
+Browser tests use actual Chrome/CDP input and a fresh profile, run their own production or development Next server, and register unique accounts/personal workspaces in the test PostgreSQL database. Domain fixtures are arranged only inside that test scope; browser actions go through HTTP and are checked with independent PostgreSQL queries. See README for exact commands and coverage. No API test-reset endpoint exists. Test cleanup deletes only that run's workspace rows; no global truncate/drop/reset script exists.
 
-CI starts a disposable PostgreSQL 17 service with test-only credentials, retains clean installation and all existing quality gates, and adds real DB plus production/development browser checks. Local results are not evidence that a GitHub run has passed; the remote workflow requires a later authorized push.
+CI starts disposable PostgreSQL 17 and Mailpit services with test-only credentials, retains clean installation and all existing quality gates, and adds real DB/auth plus production/development browser checks. Auth tests cover two-user isolation, registration, normalized duplicate emails, valid/invalid/expired/revoked sessions, single-use/expired reset tokens, verification, and account-scoped imports. Chrome tests additionally exercise real auth forms, server redirects, direct foreign-ID API requests, local SMTP links, session reload, logout/login, reset, and mobile auth forms. Local results are not evidence that a GitHub run has passed; the remote workflow requires a later authorized push.

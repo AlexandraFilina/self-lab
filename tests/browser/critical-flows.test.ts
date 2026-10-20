@@ -1,14 +1,21 @@
+import { latestMailLink } from "./mailpit";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { randomUUID, randomBytes } from "node:crypto";
+import { eq, inArray } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { openDatabase } from "../../src/server/db/client";
-import { experiments, localImports, workspaces } from "../../src/server/db/schema";
+import {
+  authUsers,
+  authVerifications,
+  experiments,
+  localImports,
+  workspaces,
+} from "../../src/server/db/schema";
 import {
   createPostgresRepository,
   ensureWorkspace,
@@ -179,7 +186,9 @@ test(
     const workspaceId = randomUUID();
     await migrate(db, { migrationsFolder: "drizzle" });
     await ensureWorkspace(db, workspaceId);
-    const repository = createPostgresRepository(db, workspaceId);
+    let repository = createPostgresRepository(db, workspaceId);
+    const testUsers: string[] = [];
+    const testWorkspaces = new Set<string>([workspaceId]);
     const port = Number(process.env.SELF_LAB_TEST_PORT ?? 3101);
     const base = `http://127.0.0.1:${port}`;
     const development = process.env.SELF_LAB_TEST_DEV === "1";
@@ -200,8 +209,10 @@ test(
         env: {
           ...process.env,
           DATABASE_URL: databaseUrl,
-          SELF_LAB_WORKSPACE_ID: workspaceId,
-          SELF_LAB_ALLOW_ANONYMOUS_WORKSPACE: "true",
+          BETTER_AUTH_URL: base,
+          BETTER_AUTH_SECRET: randomBytes(32).toString("hex"),
+          SMTP_HOST: "127.0.0.1",
+          SMTP_PORT: "1025",
         },
       },
     );
@@ -280,9 +291,81 @@ test(
           `globalThis.__selfLabDocument!==${JSON.stringify(previous) ?? "undefined"}&&!!globalThis.__selfLabDocument`,
         );
         await page.wait(`globalThis.__q('h1')?.textContent.includes(${JSON.stringify(heading)})`);
+        await page.wait(
+          "!globalThis.__q('.auth-card form')||globalThis.__q('.auth-card form').dataset.ready==='true'",
+        );
+        if (await page.evaluate("!!globalThis.__q('.auth-card form')"))
+          assert.equal(await page.evaluate("globalThis.__q('.auth-card form').method"), "post");
       }
       const onboardingHeading = "What would you like to understand about yourself?";
-      await navigate("/dashboard", onboardingHeading);
+      const accountEmail = `browser-a-${randomUUID()}@self-lab.test`;
+      const accountPassword = "A private browser passphrase!";
+      async function register(email: string) {
+        await navigate("/sign-up", "Create your account");
+        await page.fill("#auth-email", email);
+        await page.fill("#auth-password", accountPassword);
+        await page.fill("#auth-confirm", accountPassword);
+        await page.click("Create your account");
+        await page.wait(`globalThis.__q('h1')?.textContent===${JSON.stringify(onboardingHeading)}`);
+        const [user] = await db.select().from(authUsers).where(eq(authUsers.email, email));
+        assert.ok(user);
+        testUsers.push(user.id);
+        const [workspace] = await db
+          .select()
+          .from(workspaces)
+          .where(eq(workspaces.ownerUserId, user.id));
+        assert.ok(workspace);
+        testWorkspaces.add(workspace.id);
+        repository = createPostgresRepository(db, workspace.id);
+        return user;
+      }
+      async function signIn(email: string, password = accountPassword) {
+        await navigate("/sign-in", "Sign in");
+        await page.fill("#auth-email", email);
+        await page.fill("#auth-password", password);
+        await page.click("Sign in");
+        await page.wait("location.pathname==='/dashboard'&&!globalThis.__q('#auth-email')");
+      }
+      async function signOut() {
+        if (!(await page.evaluate("globalThis.__qa('.account-sign-out button').length>0")))
+          await navigate("/account", "Account");
+        await page.wait(
+          "globalThis.__qa('.account-sign-out button').some(button=>!button.disabled)",
+        );
+        await page.click("Sign out", ".account-sign-out button");
+        await page.wait("globalThis.__q('h1')?.textContent==='Sign in'");
+      }
+      async function browserCookie() {
+        const result = await page.send<{ cookies: { name: string; value: string }[] }>(
+          "Network.getCookies",
+          { urls: [base] },
+        );
+        return result.cookies.map((item) => item.name + "=" + item.value).join("; ");
+      }
+      assert.equal((await fetch(base + "/api/experiments")).status, 401);
+      await navigate("/dashboard", "Sign in");
+      const serverForm = await page.evaluate(`(async()=>{
+        const html=await (await fetch('/sign-up')).text();
+        const doc=new DOMParser().parseFromString(html,'text/html');
+        const form=doc.querySelector('form');
+        return {
+          method:form?.method,
+          ready:form?.dataset.ready,
+          inputsDisabled:[...doc.querySelectorAll('input')].length>0&&[...doc.querySelectorAll('input')].every(input=>input.disabled),
+          submitDisabled:doc.querySelector('button[type=submit]')?.disabled,
+        };
+      })()`);
+      assert.deepEqual(serverForm, {
+        method: "post",
+        ready: "false",
+        inputsDisabled: true,
+        submitDisabled: true,
+      });
+      const userA = await register(accountEmail);
+      const repositoryA = repository;
+      await navigate("/sign-in", onboardingHeading);
+      // Authenticated visits to auth pages return to Dashboard, including empty onboarding.
+
       assert.deepEqual(await repository.listExperiments(), []);
       assert.equal(await page.evaluate("localStorage.getItem('self-lab:experiments')"), null);
       assert.equal(
@@ -488,9 +571,9 @@ test(
       await navigate("/dashboard", "Hello, curious mind");
       await page.wait("!!globalThis.__q('.local-import-notice button')");
       assert.equal((await repository.listExperiments()).length, 2);
-      await page.click("Move local experiments to this workspace");
+      await page.click("Move your local experiments to your account");
       await page.wait(
-        "globalThis.__q('.local-import-notice [role=status]')?.textContent.includes('moved')",
+        "globalThis.__q('.local-import-notice [role=status]')?.textContent.includes('Imported successfully')",
       );
       assert.deepEqual(await repository.getExperiment(imported.id), imported);
       assert.equal(await page.evaluate("localStorage.getItem('self-lab:experiments')"), rawBackup);
@@ -586,16 +669,23 @@ test(
       await page.wait("!globalThis.__q('dialog')");
 
       // A failed backend read must keep the old local backup and offer a real retry.
-      await page.send("Page.addScriptToEvaluateOnNewDocument", {
-        source:
-          "globalThis.__realFetch=globalThis.fetch; globalThis.fetch=(...args)=>args[0]==='/api/experiments'?Promise.reject(new TypeError('Simulated offline backend')):globalThis.__realFetch(...args);",
-      });
+      const offlineScript = await page.send<{ identifier: string }>(
+        "Page.addScriptToEvaluateOnNewDocument",
+        {
+          source:
+            "globalThis.__realFetch=globalThis.fetch; globalThis.fetch=(...args)=>args[0]==='/api/experiments'?Promise.reject(new TypeError('Simulated offline backend')):globalThis.__realFetch(...args);",
+        },
+      );
       await navigate("/dashboard", "Workspace unavailable");
       assert.equal(await page.evaluate("localStorage.getItem('self-lab:experiments')"), rawBackup);
       await page.evaluate("globalThis.fetch=globalThis.__realFetch");
       await page.click("Retry loading");
       await page.wait("globalThis.__q('h1')?.textContent.includes('Hello, curious mind')");
+      await page.send("Page.removeScriptToEvaluateOnNewDocument", {
+        identifier: offlineScript.identifier,
+      });
       await page.screenshot(join(profile, "postgres-dashboard-mobile.png"));
+      const apiCookie = await browserCookie();
 
       for (const body of [
         { invalid: true },
@@ -603,7 +693,7 @@ test(
       ]) {
         const response = await fetch(base + "/api/experiments", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", Cookie: apiCookie },
           body: JSON.stringify(body),
         });
         assert.equal(response.status, 400);
@@ -611,24 +701,146 @@ test(
       }
       const crossSite = await fetch(base + "/api/experiments", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Origin: "https://other.example" },
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: apiCookie,
+          Origin: "https://other.example",
+        },
         body: "{}",
       });
       assert.equal(crossSite.status, 400);
       const tooLarge = await fetch(base + "/api/imports", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Cookie: apiCookie },
         body: JSON.stringify({ padding: "x".repeat(2 * 1024 * 1024) }),
       });
       assert.equal(tooLarge.status, 413);
       assert.deepEqual(await tooLarge.json(), { error: { code: "payloadTooLarge" } });
+      await navigate("/account", "Account");
+      assert.ok(
+        await page.evaluate(`document.body.textContent.includes(${JSON.stringify(accountEmail)})`),
+      );
+      const verificationLink = await latestMailLink(accountEmail, "Verify");
+      await page.send("Page.navigate", { url: verificationLink });
+      await page.wait(
+        "globalThis.__q('h1')?.textContent==='Account'&&document.body.textContent.includes('Email verified')",
+      );
+      await signOut();
+      await navigate(`/experiments/${firstId}`, "Sign in");
+      await signIn(accountEmail);
+      await page.wait("globalThis.__q('h1')?.textContent==='Hello, curious mind'");
+      await navigate(`/experiments/${firstId}`, "Reading and focus");
+      assert.equal((await repositoryA.getExperiment(firstId)).entries.length, 1);
+      await signOut();
+      const emailB = `browser-b-${randomUUID()}@self-lab.test`;
+      const userB = await register(emailB);
+      assert.notEqual(userA.id, userB.id);
+      assert.deepEqual(await repository.listExperiments(), []);
+      await navigate(`/experiments/${firstId}`, "Experiment not found");
+      const cookieB = await browserCookie();
+      for (const [method, path, body] of [
+        ["GET", `/api/experiments/${firstId}`, undefined],
+        [
+          "PUT",
+          `/api/experiments/${firstId}/entries`,
+          {
+            observedDate: today,
+            timeZone: timezone,
+            draft: { habitStatus: "done", values: { mood: 2 } },
+          },
+        ],
+        [
+          "PATCH",
+          `/api/experiments/${firstId}/lifecycle`,
+          { timeZone: timezone, requestId: randomUUID(), intent: { type: "finish" } },
+        ],
+        [
+          "PATCH",
+          `/api/experiments/${firstId}/lifecycle`,
+          { timeZone: timezone, requestId: randomUUID(), intent: { type: "reopen" } },
+        ],
+      ] as const) {
+        const response = await fetch(base + path, {
+          method,
+          headers: { "Content-Type": "application/json", Cookie: cookieB },
+          body: body ? JSON.stringify(body) : undefined,
+        });
+        assert.equal(response.status, 404);
+        assert.deepEqual(await response.json(), { error: { code: "experimentMissing" } });
+      }
+      const fakeOwner = await fetch(base + "/api/imports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: cookieB },
+        body: JSON.stringify({ workspaceId, experiments: [imported] }),
+      });
+      assert.equal(fakeOwner.status, 400);
+      assert.equal((await repositoryA.getExperiment(firstId)).entries[0].values[custom.id], 8);
+      await navigate("/account", "Account");
+      await signOut();
+      await navigate("/forgot-password", "Reset your password");
+      await page.fill("#auth-email", emailB);
+      await page.click("Send reset instructions");
+      await page.wait(
+        "globalThis.__q('[role=status]')?.textContent.includes('If an account exists')",
+      );
+      const resetLink = await latestMailLink(emailB, "Reset");
+      await page.send("Page.navigate", { url: resetLink });
+      await page.wait(
+        "globalThis.__q('h1')?.textContent==='Choose a new password'&&globalThis.__q('.auth-card form')?.dataset.ready==='true'",
+      );
+      const replacementPassword = "A replacement browser passphrase!";
+      await page.fill("#auth-password", replacementPassword);
+      await page.fill("#auth-confirm", replacementPassword);
+      await page.click("Save new password");
+      await page.wait(
+        "globalThis.__q('[role=status]')?.textContent.includes('password has been updated')",
+      );
+      await signIn(emailB, replacementPassword);
+      await page.wait(`globalThis.__q('h1')?.textContent===${JSON.stringify(onboardingHeading)}`);
+      assert.equal(
+        (await fetch(base + "/api/experiments", { headers: { Cookie: cookieB } })).status,
+        401,
+      );
+      await signOut();
+      for (const [route, heading] of [
+        ["/sign-in", "Sign in"],
+        ["/sign-up", "Create your account"],
+        ["/forgot-password", "Reset your password"],
+        ["/reset-password", "Choose a new password"],
+      ]) {
+        await navigate(route, heading);
+        assert.ok(
+          await page.evaluate("document.documentElement.scrollWidth<=window.innerWidth"),
+          `Auth mobile overflow: ${route}`,
+        );
+        assert.equal(await page.evaluate("/[А-Яа-яЁё]/.test(document.body.textContent)"), false);
+      }
+      await page.screenshot(join(profile, "auth-mobile.png"));
+      const verificationToken = new URL(verificationLink).searchParams.get("token");
+      const resetToken = new URL(resetLink).pathname.split("/").at(-1);
+      assert.ok(verificationToken && resetToken);
+      assert.ok(
+        !serverLog.includes(verificationToken),
+        "Verification token must not appear in server logs",
+      );
+      assert.ok(!serverLog.includes(resetToken), "Reset token must not appear in server logs");
+      assert.ok(
+        !serverLog.includes(accountPassword) && !serverLog.includes(replacementPassword),
+        "Passwords must not appear in server logs",
+      );
+      assert.doesNotMatch(serverLog, /[?&](?:email|password|confirmPassword|newPassword)=/i);
       assert.equal(page.errors.length, 0, page.errors.join("\n"));
       assert.doesNotMatch(serverLog, /dropped from rendering/);
       console.log(
         `Browser mode: ${development ? "development" : "production"}; screenshots: ${profile}`,
       );
     } catch (error) {
-      console.error("Application server log:", serverLog);
+      console.error(
+        "Application server log:",
+        serverLog
+          .replace(/([?&](?:token|password|confirmPassword|newPassword)=)[^&\s]+/gi, "$1[redacted]")
+          .replace(/reset-password\/[A-Za-z0-9_-]+/g, "reset-password/[redacted]"),
+      );
       if (browser) {
         console.error(
           "Browser diagnostics:",
@@ -649,9 +861,14 @@ test(
       server.kill("SIGTERM");
       server.stdout.destroy();
       server.stderr.destroy();
-      await db.delete(experiments).where(eq(experiments.workspaceId, workspaceId));
-      await db.delete(localImports).where(eq(localImports.workspaceId, workspaceId));
-      await db.delete(workspaces).where(eq(workspaces.id, workspaceId));
+      const workspaceIds = [...testWorkspaces];
+      await db.delete(experiments).where(inArray(experiments.workspaceId, workspaceIds));
+      await db.delete(localImports).where(inArray(localImports.workspaceId, workspaceIds));
+      await db.delete(workspaces).where(inArray(workspaces.id, workspaceIds));
+      if (testUsers.length) {
+        await db.delete(authVerifications).where(inArray(authVerifications.value, testUsers));
+        await db.delete(authUsers).where(inArray(authUsers.id, testUsers));
+      }
       await pool.end();
     }
   },

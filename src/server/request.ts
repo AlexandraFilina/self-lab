@@ -1,10 +1,10 @@
 import "server-only";
 import { AppError } from "@/lib/errors";
 const MAX_BYTES = 2 * 1024 * 1024;
-export async function readJson(request: Request): Promise<unknown> {
+export async function readJson(request: Request, maximumBytes = MAX_BYTES): Promise<unknown> {
   if (!request.headers.get("content-type")?.startsWith("application/json"))
     throw new AppError("invalidRequest");
-  if (Number(request.headers.get("content-length")) > MAX_BYTES)
+  if (Number(request.headers.get("content-length")) > maximumBytes)
     throw new AppError("payloadTooLarge");
   const reader = request.body?.getReader();
   if (!reader) throw new AppError("invalidRequest");
@@ -15,7 +15,7 @@ export async function readJson(request: Request): Promise<unknown> {
       const { done, value } = await reader.read();
       if (done) break;
       size += value.byteLength;
-      if (size > MAX_BYTES) {
+      if (size > maximumBytes) {
         await reader.cancel();
         throw new AppError("payloadTooLarge");
       }

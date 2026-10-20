@@ -13,18 +13,22 @@
     "format:check": "prettier --check .",
     "test:browser": "node --conditions=react-server --import tsx --test tests/browser/*.test.ts",
     "test:browser:dev": "SELF_LAB_TEST_DEV=1 node --conditions=react-server --import tsx --test tests/browser/*.test.ts",
-    "db:generate": "drizzle-kit generate",
+    "db:generate": "node --conditions=react-server node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate": "node --conditions=react-server --import tsx scripts/db-migrate.ts",
     "db:seed": "node --conditions=react-server --import tsx scripts/db-seed.ts",
     "db:status": "node --conditions=react-server --import tsx scripts/db-status.ts",
-    "test:db": "node --conditions=react-server --import tsx --test tests/integration/*.test.ts"
+    "test:db": "node --conditions=react-server --import tsx --test tests/integration/*.test.ts",
+    "test:auth": "node --conditions=react-server --import tsx --test tests/integration/auth.test.ts"
   },
   "dependencies": {
+    "@better-auth/drizzle-adapter": "^1.7.8",
     "@radix-ui/react-slot": "^1.5.0",
+    "better-auth": "^1.7.8",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.4",
     "next": "16.4.0",
+    "nodemailer": "^10.1.1",
     "pg": "^8.23.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -35,6 +39,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",

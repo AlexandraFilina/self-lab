@@ -57,3 +57,11 @@ test("JSON body validation rejects non-JSON, malformed, and oversized streamed i
   });
   await assert.rejects(readJson(make(stream)), coded("payloadTooLarge"));
 });
+test("auth callers can enforce a smaller limit measured in streamed UTF-8 bytes", async () => {
+  const request = new Request("http://localhost/api/auth/sign-up/email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ value: "é".repeat(20) }),
+  });
+  await assert.rejects(readJson(request, 32), coded("payloadTooLarge"));
+});
