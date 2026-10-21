@@ -93,10 +93,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main id="main-content" className="main-content">
           {children}
         </main>
-        <footer className="footer">
-          <span>{t.shell.curiosity}</span>
-          <span>{t.shell.storage}</span>
-        </footer>
+        {pathname !== "/dashboard" && (
+          <footer className="footer">
+            <span>{t.shell.curiosity}</span>
+            <span>{t.shell.storage}</span>
+          </footer>
+        )}
       </div>
     </div>
   );

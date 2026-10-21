@@ -20,6 +20,7 @@ export function DailyEntryButton({
   row = false,
   variant = "primary",
   label,
+  showSavedFeedback = true,
 }: {
   experiment: Experiment;
   className?: string;
@@ -28,6 +29,7 @@ export function DailyEntryButton({
   row?: boolean;
   variant?: "primary" | "secondary" | "ghost";
   label?: string;
+  showSavedFeedback?: boolean;
 }) {
   const { referenceDate } = useExperiments();
   const [openDate, setOpenDate] = useState<string | null>(null),
@@ -69,7 +71,7 @@ export function DailyEntryButton({
                   : t.checkIn.today)}
         </Button>
       )}
-      {saved && (
+      {saved && showSavedFeedback && (
         <p className="save-feedback" role="status">
           {t.checkIn.saved}
         </p>

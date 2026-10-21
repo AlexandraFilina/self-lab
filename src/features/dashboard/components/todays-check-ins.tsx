@@ -3,15 +3,11 @@
 import Link from "next/link";
 import { t } from "@/i18n";
 import { Card } from "@/components/ui";
-import { useExperiments } from "@/features/experiments/context/experiments-provider";
 import { DailyEntryButton } from "@/features/experiments/components/daily-entry";
 import { ExperimentLifecycle } from "@/features/experiments/components/experiment-lifecycle";
 import { getDailyWorkflow } from "../model/daily-workflow";
 
-export function TodaysCheckIns() {
-  const { experiments, referenceDate } = useExperiments();
-  const workflow = getDailyWorkflow(experiments, referenceDate);
-  if (workflow.rows.length === 0) return null;
+export function TodaysCheckIns({ workflow }: { workflow: ReturnType<typeof getDailyWorkflow> }) {
   return (
     <Card className="daily-workflow" aria-labelledby="daily-workflow-heading">
       <div className="section-heading">
@@ -31,11 +27,19 @@ export function TodaysCheckIns() {
       {workflow.hasTargetDecisions && <p className="field-hint">{t.dailyWorkflow.targetSummary}</p>}
       <ul className="daily-workflow-rows">
         {workflow.rows.map(
-          ({ experiment, todayEntry, canCheckInToday, canAddYesterday, windowComplete }) => (
+          ({
+            experiment,
+            todayEntry,
+            elapsedDays,
+            elapsedPercent,
+            canCheckInToday,
+            canAddYesterday,
+            windowComplete,
+          }) => (
             <li
               key={experiment.id}
               data-experiment-id={experiment.id}
-              className="daily-workflow-row"
+              className={`daily-workflow-row${todayEntry ? " daily-workflow-checked" : ""}`}
             >
               <div className="daily-workflow-experiment">
                 <h3>
@@ -49,6 +53,19 @@ export function TodaysCheckIns() {
                 {!canCheckInToday && !windowComplete && (
                   <p className="muted">{t.dailyWorkflow.notStarted}</p>
                 )}
+                <div className="daily-workflow-progress">
+                  <span>{t.common.dayOf(elapsedDays, experiment.durationDays)}</span>
+                  <div
+                    className="progress-track"
+                    role="progressbar"
+                    aria-label={t.dailyWorkflow.progress}
+                    aria-valuemin={0}
+                    aria-valuemax={experiment.durationDays}
+                    aria-valuenow={elapsedDays}
+                  >
+                    <div style={{ width: `${elapsedPercent}%` }} />
+                  </div>
+                </div>
               </div>
               <div className="daily-workflow-actions">
                 {canCheckInToday && (
@@ -56,7 +73,8 @@ export function TodaysCheckIns() {
                     experiment={experiment}
                     date={workflow.today}
                     label={todayEntry ? t.common.edit : t.checkIn.check}
-                    variant={todayEntry ? "secondary" : "primary"}
+                    variant="secondary"
+                    showSavedFeedback={false}
                   />
                 )}
                 {canAddYesterday && (
@@ -64,7 +82,8 @@ export function TodaysCheckIns() {
                     experiment={experiment}
                     date={workflow.yesterday}
                     label={t.dailyWorkflow.addYesterday}
-                    variant="ghost"
+                    variant="secondary"
+                    showSavedFeedback={false}
                   />
                 )}
               </div>

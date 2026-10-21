@@ -10,19 +10,29 @@ export function LocalImportNotice() {
     importLocalExperiments,
     pending,
     reload,
+    status,
   } = useExperiments();
-  if (!localImportCount && !localImportError && !localImportDone) return null;
   return (
-    <Card className="local-import-notice">
+    <Card className="local-import-notice account-card">
+      <h2>{t.importLocal.data}</h2>
       {localImportCount > 0 && (
         <>
           <p>{t.importLocal.found(localImportCount)}</p>
           <p className="field-hint">{t.importLocal.backup}</p>
-          <Button variant="secondary" disabled={pending} onClick={importLocalExperiments}>
-            {pending ? t.importLocal.moving : t.importLocal.action}
-          </Button>
         </>
       )}
+      {status === "loading" && <p className="field-hint">{t.storage.loading}</p>}
+      {status === "error" && <p className="field-hint">{t.storage.errorTitle}</p>}
+      {status === "ready" && !localImportCount && !localImportDone && !localImportError && (
+        <p className="field-hint">{t.importLocal.none}</p>
+      )}
+      <Button
+        variant="secondary"
+        disabled={pending || status !== "ready" || !localImportCount}
+        onClick={importLocalExperiments}
+      >
+        {pending ? t.importLocal.moving : t.importLocal.action}
+      </Button>
       {localImportDone && <p role="status">{t.importLocal.done}</p>}
       {localImportError && (
         <>

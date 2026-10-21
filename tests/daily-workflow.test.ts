@@ -52,6 +52,22 @@ test("an active user experiment without a today entry is a pending check-in", ()
   assert.equal(result.total, 1);
   assert.equal(result.caughtUp, false);
 });
+test("dashboard progress tracks elapsed observation days rather than saved entries", () => {
+  const active = experiment("first", addDays(TODAY, -4), 14);
+  const row = getDailyWorkflow([active], TODAY).rows[0];
+  assert.equal(row.elapsedDays, 5);
+  assert.equal(row.elapsedPercent, 36);
+  assert.equal(row.experiment.entries.length, 0);
+  assert.equal(
+    getDailyWorkflow([experiment("future", addDays(TODAY, 1))], TODAY).rows[0].elapsedDays,
+    0,
+  );
+  assert.equal(
+    getDailyWorkflow([experiment("expired", addDays(TODAY, -20), 14)], TODAY).rows[0]
+      .elapsedPercent,
+    100,
+  );
+});
 test("Done and Not done are both checked-in observations available to edit", () => {
   for (const status of ["done", "not_done"] as const) {
     const saved = record(experiment("first"), TODAY, status);

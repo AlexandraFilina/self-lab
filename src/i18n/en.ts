@@ -164,6 +164,7 @@ If you did not create an account, you can ignore this email.`,
   },
   dailyWorkflow: {
     title: "Today's check-ins",
+    progress: "Observation window progress",
     pending: "Not checked in today",
     checked: "Checked in today",
     addYesterday: "Add yesterday",
@@ -449,7 +450,9 @@ If you did not create an account, you can ignore this email.`,
       "Subjective scores are approximate. Small or unbalanced samples, self-reporting, workload, weekends, and other circumstances limit interpretation. These observations do not establish causation or statistical significance.",
   },
   importLocal: {
-    action: "Move your local experiments to your account",
+    data: "Data",
+    action: "Import local experiments",
+    none: "No local experiments found in this browser.",
     moving: "Moving…",
     found: (count: number) =>
       `${count} local ${count === 1 ? "experiment is" : "experiments are"} available to move.`,

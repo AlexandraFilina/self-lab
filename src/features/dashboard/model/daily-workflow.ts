@@ -1,4 +1,4 @@
-import { addDays } from "@/lib/dates";
+import { addDays, dayOffset } from "@/lib/dates";
 import { endDate } from "@/features/experiments/model/analytics";
 import type { Experiment } from "@/features/experiments/model/types";
 
@@ -9,9 +9,15 @@ export function getDailyWorkflow(experiments: readonly Experiment[], today: stri
     .map((experiment) => {
       const lastDay = endDate(experiment);
       const todayEntry = experiment.entries.find((entry) => entry.observedDate === today);
+      const elapsedDays = Math.min(
+        experiment.durationDays,
+        Math.max(0, dayOffset(experiment.startDate, today) + 1),
+      );
       return {
         experiment,
         todayEntry,
+        elapsedDays,
+        elapsedPercent: Math.round((elapsedDays / experiment.durationDays) * 100),
         canCheckInToday: today >= experiment.startDate && today <= lastDay,
         canAddYesterday:
           yesterday >= experiment.startDate &&

@@ -2425,12 +2425,16 @@ thead th {
   margin: 18px 0 0;
 }
 .daily-workflow-row {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 148px;
   align-items: center;
   gap: 12px 24px;
-  padding: 16px 0;
+  padding: 16px 12px;
   border-top: 1px solid var(--border);
+}
+.daily-workflow-checked {
+  background: #faf8ff;
+  border-radius: 8px;
 }
 .daily-workflow-row:last-child {
   padding-bottom: 0;
@@ -2448,15 +2452,29 @@ thead th {
   font-size: 11px;
   margin-top: 4px;
 }
+.daily-workflow-progress {
+  max-width: 190px;
+  margin-top: 12px;
+  color: #96909f;
+  font-size: 10px;
+}
+.daily-workflow-progress .progress-track {
+  margin-top: 7px;
+}
 .daily-workflow-actions {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 8px;
+}
+.daily-workflow-actions .button {
+  width: 100%;
+  min-height: 41px;
 }
 .daily-workflow-row .lifecycle-inline {
   width: 100%;
   margin: 0;
+  grid-column: 1 / -1;
 }
 .lifecycle-inline h2 {
   font-size: 12px;
@@ -2467,11 +2485,23 @@ thead th {
 
 .local-import-notice {
   padding: 18px 24px;
-  margin-bottom: 24px;
+  margin-top: 20px;
   font-size: 12px;
 }
 .local-import-notice .button {
   margin-top: 12px;
+}
+@media (max-width: 600px) {
+  .daily-workflow-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .daily-workflow-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .daily-workflow-actions > div {
+    flex: 1 1 130px;
+  }
 }
 
 .auth-page {

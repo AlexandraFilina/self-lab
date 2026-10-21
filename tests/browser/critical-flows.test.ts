@@ -500,7 +500,35 @@ test(
         await page.evaluate("globalThis.__q('.daily-workflow-summary').textContent"),
         "1 of 2 checked in today",
       );
-      await page.click("Check in today", ".focus-card button");
+      assert.equal(await page.evaluate("globalThis.__qa('.daily-workflow-row').length"), 2);
+      assert.ok(
+        await page.evaluate(
+          "!globalThis.__q('.stats-grid,.focus-card,.today-card,.reflection-card,.local-import-notice,.footer')",
+        ),
+      );
+      assert.ok(
+        await page.evaluate(
+          `globalThis.__q('.daily-workflow-row[data-experiment-id="${firstId}"]').classList.contains('daily-workflow-checked')`,
+        ),
+      );
+      assert.equal(
+        await page.evaluate(
+          `globalThis.__q('.daily-workflow-row[data-experiment-id="${firstId}"] [role=progressbar]').getAttribute('aria-valuenow')`,
+        ),
+        "1",
+      );
+      assert.equal(
+        await page.evaluate(
+          `globalThis.__q('.daily-workflow-row[data-experiment-id="${secondId}"] [role=progressbar]').getAttribute('aria-valuenow')`,
+        ),
+        "1",
+      );
+      assert.ok(
+        await page.evaluate(
+          `(()=>{const first=globalThis.__q('.daily-workflow-row[data-experiment-id="${firstId}"] .daily-workflow-actions button');const second=globalThis.__q('.daily-workflow-row[data-experiment-id="${secondId}"] .daily-workflow-actions button');return first&&second&&Math.abs(first.getBoundingClientRect().height-second.getBoundingClientRect().height)<1&&Math.abs(first.getBoundingClientRect().left-second.getBoundingClientRect().left)<1&&first.className===second.className})()`,
+        ),
+      );
+      await page.click("Edit", `.daily-workflow-row[data-experiment-id="${firstId}"] button`);
       await page.dialogOpen();
       await page.click("Cancel", "dialog button");
       await page.wait("!globalThis.__q('dialog')");
@@ -512,6 +540,17 @@ test(
       await page.wait(
         "!globalThis.__q('dialog')&&globalThis.__q('.daily-workflow-summary')?.textContent==='2 of 2 checked in today'",
       );
+      assert.ok(
+        await page.evaluate(
+          `globalThis.__q('.daily-workflow-row[data-experiment-id="${secondId}"]').classList.contains('daily-workflow-checked')`,
+        ),
+      );
+      assert.ok(
+        await page.evaluate(
+          `globalThis.__q('.daily-workflow-row[data-experiment-id="${secondId}"] button').textContent.includes('Edit')`,
+        ),
+      );
+      assert.ok(await page.evaluate("!globalThis.__q('.daily-workflow .save-feedback')"));
       assert.equal(await page.evaluate("globalThis.__selfLabDocument"), documentId);
       assert.equal((await repository.getExperiment(secondId)).entries[0].habitStatus, "not_done");
       await navigate("/dashboard", "Hello, curious mind");
@@ -569,9 +608,11 @@ test(
         `localStorage.setItem('self-lab:experiments',${JSON.stringify(rawBackup)})`,
       );
       await navigate("/dashboard", "Hello, curious mind");
-      await page.wait("!!globalThis.__q('.local-import-notice button')");
+      assert.ok(await page.evaluate("!globalThis.__q('.local-import-notice')"));
+      await navigate("/account", "Account");
+      await page.wait("!!globalThis.__q('.local-import-notice button:not(:disabled)')");
       assert.equal((await repository.listExperiments()).length, 2);
-      await page.click("Move your local experiments to your account");
+      await page.click("Import local experiments");
       await page.wait(
         "globalThis.__q('.local-import-notice [role=status]')?.textContent.includes('Imported successfully')",
       );
@@ -596,7 +637,7 @@ test(
       assert.equal(yesterdayEdit.entries[0].habitStatus, "not_done");
       assert.equal(yesterdayEdit.entries[0].values[importedCustom.id], 4);
       await navigate("/dashboard", "Hello, curious mind");
-      assert.ok(await page.evaluate("!globalThis.__q('.local-import-notice button')"));
+      assert.ok(await page.evaluate("!globalThis.__q('.local-import-notice')"));
       assert.deepEqual(await repository.getExperiment(imported.id), yesterdayEdit);
       assert.equal(await page.evaluate("localStorage.getItem('self-lab:experiments')"), rawBackup);
 
