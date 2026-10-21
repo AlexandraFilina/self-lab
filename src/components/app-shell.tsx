@@ -55,21 +55,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="sidebar-note">
-            <span className="icon-tile small">
-              <Icon name="leaf" />
-            </span>
-            <strong>
-              {t.shell.smallChanges}
-              <br />
-              {t.shell.discovery}
-            </strong>
-            <p>
-              {t.shell.rhythm}
-              <br />
-              {t.shell.next}
-            </p>
-          </div>
           <div className="demo-profile">
             <span className="avatar">{t.shell.initial}</span>
             <span>
@@ -93,12 +78,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main id="main-content" className="main-content">
           {children}
         </main>
-        {pathname !== "/dashboard" && (
-          <footer className="footer">
-            <span>{t.shell.curiosity}</span>
-            <span>{t.shell.storage}</span>
-          </footer>
-        )}
       </div>
     </div>
   );

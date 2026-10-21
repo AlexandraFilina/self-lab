@@ -48,22 +48,18 @@ export function DailyReflectionCard() {
     }
   }
   return (
-    <Card className="daily-reflection" aria-labelledby="daily-reflection-heading">
-      <div className="section-heading">
+    <Card
+      className={`daily-reflection${saved && !editing ? " daily-reflection-saved" : ""}`}
+      aria-labelledby="daily-reflection-heading"
+    >
+      <div className="daily-reflection-header">
         <div>
           <h2 id="daily-reflection-heading">{t.reflection.title}</h2>
           {!saved && <p className="muted">{t.reflection.help}</p>}
         </div>
         {saved && !editing && (
-          <Button variant="secondary" onClick={openEdit}>
-            {t.reflection.edit}
-          </Button>
-        )}
-      </div>
-      {saved && !editing ? (
-        <div className="daily-reflection-summary">
-          <p>{t.reflection.summary}</p>
-          <div>
+          <div className="daily-reflection-summary">
+            <span className="sr-only">{t.reflection.summary}</span>
             {visible
               .filter((item) => saved.values[item.definition.id] !== undefined)
               .map((item) => (
@@ -73,8 +69,14 @@ export function DailyReflectionCard() {
                 </span>
               ))}
           </div>
-        </div>
-      ) : (
+        )}
+        {saved && !editing && (
+          <Button variant="secondary" onClick={openEdit}>
+            {t.reflection.edit}
+          </Button>
+        )}
+      </div>
+      {(!saved || editing) && (
         <form onSubmit={submit} noValidate>
           <div className="daily-reflection-sliders">
             {visible.map(({ definition }) => (

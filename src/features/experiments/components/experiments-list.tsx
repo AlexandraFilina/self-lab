@@ -35,9 +35,7 @@ export function ExperimentsList() {
   return (
     <>
       <PageHeading
-        eyebrow={t.experiments.eyebrow}
         title={t.experiments.title}
-        description={t.experiments.description}
         action={
           <Link href="/experiments/new" className="button button-primary">
             <Icon name="plus" />
@@ -59,11 +57,6 @@ export function ExperimentsList() {
             </button>
           ))}
         </div>
-        <span className="muted">
-          {experiments.some((experiment) => experiment.source === "sample")
-            ? t.experiments.source
-            : t.form.local}
-        </span>
       </div>
       {visible.length ? (
         <div className="experiments-grid">
@@ -81,10 +74,6 @@ export function ExperimentsList() {
           </Link>
         </Card>
       )}
-      <div className="list-bottom-note">
-        <Icon name="info" />
-        <p>{t.experiments.advice}</p>
-      </div>
     </>
   );
 }

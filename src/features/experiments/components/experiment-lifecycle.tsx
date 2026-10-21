@@ -60,12 +60,7 @@ export function ExperimentLifecycle({
       ) : progress.windowComplete && !compact ? (
         <>
           <h2>{t.lifecycle.windowComplete}</h2>
-          {!inline && (
-            <>
-              <p>{t.lifecycle.recorded(progress.recorded, progress.total)}</p>
-              <p className="muted">{t.lifecycle.targetPrompt}</p>
-            </>
-          )}
+          {!inline && <p className="muted">{t.lifecycle.targetPrompt}</p>}
           <div className="lifecycle-actions">
             <Button
               disabled={pending}

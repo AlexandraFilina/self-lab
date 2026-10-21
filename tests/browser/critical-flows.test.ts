@@ -564,7 +564,7 @@ test(
       );
       assert.ok(
         await page.evaluate(
-          `(()=>{const first=globalThis.__q('.daily-workflow-row[data-experiment-id="${firstId}"] .daily-workflow-actions button');const second=globalThis.__q('.daily-workflow-row[data-experiment-id="${secondId}"] .daily-workflow-actions button');return first&&second&&Math.abs(first.getBoundingClientRect().height-second.getBoundingClientRect().height)<1&&Math.abs(first.getBoundingClientRect().left-second.getBoundingClientRect().left)<1&&first.className===second.className})()`,
+          `(()=>{const first=globalThis.__q('.daily-workflow-row[data-experiment-id="${firstId}"] .daily-workflow-actions button');const second=globalThis.__q('.daily-workflow-row[data-experiment-id="${secondId}"] .daily-workflow-actions button');return first&&second&&Math.abs(first.getBoundingClientRect().height-second.getBoundingClientRect().height)<1&&Math.abs(first.getBoundingClientRect().left-second.getBoundingClientRect().left)<1&&first.classList.contains('button-secondary')&&second.classList.contains('button-primary')})()`,
         ),
       );
       await page.click("Edit", `.daily-workflow-row[data-experiment-id="${firstId}"] button`);

@@ -5,8 +5,8 @@ import { t } from "@/i18n";
 import { useExperiments } from "@/features/experiments/context/experiments-provider";
 import Link from "next/link";
 import type { Experiment } from "@/features/experiments/model/types";
-import { formatCount, formatDate } from "@/lib/format";
-import { endDate, getProgress } from "@/features/experiments/model/analytics";
+import { formatDate } from "@/lib/format";
+import { endDate, getProgress, observedWindowDays } from "@/features/experiments/model/analytics";
 import { metricLabel, metricColor } from "@/features/experiments/model/metrics";
 import { Card } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -25,24 +25,23 @@ export function StatusBadge({ experiment }: { experiment: Experiment }) {
 export function ExperimentProgress({ experiment }: { experiment: Experiment }) {
   const { referenceDate } = useExperiments();
   const progress = getProgress(experiment, referenceDate);
+  const elapsedDays = progress.completed
+    ? observedWindowDays(experiment)
+    : Math.min(progress.total, progress.elapsedDays);
   return (
     <div className="experiment-progress">
       <div className="progress-caption">
-        <span>{t.experiments.recorded}</span>
-        <strong>
-          {progress.recorded}
-          <span> / {progress.total}</span>
-        </strong>
+        <strong>{t.common.dayOf(elapsedDays, progress.total)}</strong>
       </div>
       <div
         className="progress-track"
         role="progressbar"
-        aria-label={t.experiments.recorded}
+        aria-label={t.dailyWorkflow.progress}
         aria-valuemin={0}
         aria-valuemax={progress.total}
-        aria-valuenow={progress.recorded}
+        aria-valuenow={elapsedDays}
       >
-        <div style={{ width: `${progress.percent}%` }} />
+        <div style={{ width: `${(elapsedDays / progress.total) * 100}%` }} />
       </div>
     </div>
   );
@@ -53,18 +52,7 @@ export function ExperimentCard({ experiment }: { experiment: Experiment }) {
   const progress = getProgress(experiment, referenceDate);
   return (
     <Card className="experiment-card">
-      <div className="section-heading">
-        <span className="icon-tile">
-          <Icon
-            name={
-              experiment.id === "early-sleep"
-                ? "moon"
-                : experiment.id === "morning-walk"
-                  ? "leaf"
-                  : "flask"
-            }
-          />
-        </span>
+      <div className="section-heading experiment-card-heading">
         <div className="card-badges">
           <StatusBadge experiment={experiment} />
           {experiment.source === "sample" && (
@@ -84,18 +72,13 @@ export function ExperimentCard({ experiment }: { experiment: Experiment }) {
           </span>
         ))}
       </div>
-      <ExperimentProgress experiment={experiment} />
-      <div className="card-meta">
-        <span>
-          <Icon name="calendar" />
-          {formatCount(progress.total, "day")} · {t.experiments.daily}
-        </span>
-        <span>
-          {progress.completed
-            ? t.dashboard.completedCaption
-            : t.common.dayOf(progress.day, progress.total)}
-        </span>
-      </div>
+      {progress.completed ? (
+        <p className="experiment-observation-count">
+          {t.experiments.observationCount(progress.recorded)}
+        </p>
+      ) : (
+        <ExperimentProgress experiment={experiment} />
+      )}
       <div className="experiment-card-footer">
         <span>
           {formatDate(experiment.startDate)} — {formatDate(endDate(experiment))}

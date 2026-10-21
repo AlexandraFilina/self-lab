@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import { t } from "@/i18n";
-import { Card } from "@/components/ui";
 import { DailyEntryButton } from "@/features/experiments/components/daily-entry";
 import { ExperimentLifecycle } from "@/features/experiments/components/experiment-lifecycle";
 import { getDailyWorkflow } from "../model/daily-workflow";
 
 export function TodaysCheckIns({ workflow }: { workflow: ReturnType<typeof getDailyWorkflow> }) {
   return (
-    <Card className="daily-workflow" aria-labelledby="daily-workflow-heading">
+    <section className="daily-workflow" aria-labelledby="daily-workflow-heading">
       <div className="section-heading">
         <h2 id="daily-workflow-heading">{t.dailyWorkflow.title}</h2>
         {workflow.total > 0 && (
@@ -18,13 +17,6 @@ export function TodaysCheckIns({ workflow }: { workflow: ReturnType<typeof getDa
           </p>
         )}
       </div>
-      {workflow.caughtUp && (
-        <div className="daily-workflow-caught-up" role="status">
-          <p>{t.dailyWorkflow.caughtUp}</p>
-          <p className="muted">{t.dailyWorkflow.caughtUpHelp}</p>
-        </div>
-      )}
-      {workflow.hasTargetDecisions && <p className="field-hint">{t.dailyWorkflow.targetSummary}</p>}
       <ul className="daily-workflow-rows">
         {workflow.rows.map(
           ({
@@ -46,9 +38,9 @@ export function TodaysCheckIns({ workflow }: { workflow: ReturnType<typeof getDa
                   <Link href={`/experiments/${experiment.id}`}>{experiment.title}</Link>
                 </h3>
                 {canCheckInToday && (
-                  <p className="muted">
+                  <span className="sr-only">
                     {todayEntry ? t.dailyWorkflow.checked : t.dailyWorkflow.pending}
-                  </p>
+                  </span>
                 )}
                 {!canCheckInToday && !windowComplete && (
                   <p className="muted">{t.dailyWorkflow.notStarted}</p>
@@ -73,7 +65,7 @@ export function TodaysCheckIns({ workflow }: { workflow: ReturnType<typeof getDa
                     experiment={experiment}
                     date={workflow.today}
                     label={todayEntry ? t.common.edit : t.checkIn.check}
-                    variant="secondary"
+                    variant={todayEntry ? "secondary" : "primary"}
                     showSavedFeedback={false}
                   />
                 )}
@@ -92,6 +84,6 @@ export function TodaysCheckIns({ workflow }: { workflow: ReturnType<typeof getDa
           ),
         )}
       </ul>
-    </Card>
+    </section>
   );
 }

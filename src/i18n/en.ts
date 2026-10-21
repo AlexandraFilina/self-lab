@@ -186,6 +186,7 @@ If you did not create an account, you can ignore this email.`,
     advice:
       "One experiment, one question. Start with a change that fits easily into your daily life.",
     recorded: "Days checked in",
+    observationCount: (count: number) => `${count} ${count === 1 ? "observation" : "observations"}`,
     daily: "Daily habit comparison",
     compare: "Ready to compare",
     missing: "Experiment not found",

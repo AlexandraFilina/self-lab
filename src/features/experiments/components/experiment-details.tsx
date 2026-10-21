@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { t } from "@/i18n";
-import { formatCount, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { endDate, getProgress } from "../model/analytics";
 import { useExperiments } from "../context/experiments-provider";
 import { DailyEntryButton } from "./daily-entry";
@@ -53,7 +53,6 @@ export function ExperimentDetails({ id }: { id: string }) {
       <div className="detail-heading">
         <div>
           <div className="detail-eyebrow">
-            <span className="eyebrow">{t.experiments.daily}</span>
             <StatusBadge experiment={experiment} />
             {experiment.source === "sample" && (
               <span className="neutral-badge">{t.common.sample}</span>
@@ -62,8 +61,7 @@ export function ExperimentDetails({ id }: { id: string }) {
           <h1>{experiment.title}</h1>
           <p className="detail-date">
             <Icon name="calendar" />
-            {formatDate(experiment.startDate)} — {formatDate(endDate(experiment))} ·{" "}
-            {formatCount(progress.total, "day")}
+            {formatDate(experiment.startDate)} — {formatDate(endDate(experiment))}
           </p>
         </div>
         <div className="detail-actions">
@@ -73,68 +71,25 @@ export function ExperimentDetails({ id }: { id: string }) {
           )}
         </div>
       </div>
-      <Card className="hypothesis-card">
-        <span className="icon-tile small">
-          <Icon name="sparkles" />
-        </span>
+      <Card className="detail-overview-card">
         <div>
           <span className="eyebrow">{t.experiments.question}</span>
           <p>{experiment.question}</p>
         </div>
-      </Card>
-      <div className="detail-conditions">
-        <Card className="detail-condition detail-condition-current">
-          <div className="condition-label">
-            <span className="period-letter">
-              <Icon name="leaf" />
-            </span>
-            <h2>{t.experiments.habit}</h2>
-          </div>
-          <p>{experiment.habit}</p>
-        </Card>
-        <Card className="detail-condition">
-          <div className="condition-label">
-            <span className="period-letter">
-              <Icon name="chart" />
-            </span>
-            <h2>{t.experiments.method}</h2>
-          </div>
-          <p>{t.experiments.methodText}</p>
-        </Card>
-      </div>
-      <Card className="detail-progress-card">
         <div>
-          <h2>
-            {progress.completed
-              ? t.experiments.completed
-              : t.common.dayOf(progress.day, progress.total)}
-          </h2>
-          <p className="muted">
-            {progress.completed
-              ? t.experiments.completedText
-              : experiment.entries.length === 0
-                ? t.onboarding.startToday
-                : t.experiments.progressText}
-          </p>
+          <span className="eyebrow">{t.experiments.habit}</span>
+          <p>{experiment.habit}</p>
         </div>
+      </Card>
+      <Card className="detail-progress-card">
         <ExperimentProgress experiment={experiment} />
+        <p className="muted">{t.experiments.observationCount(progress.recorded)}</p>
       </Card>
       {(progress.completed || progress.windowComplete) && (
         <ExperimentLifecycle experiment={experiment} />
       )}
       <Card className="detail-chart-card">
-        <div className="section-heading">
-          <div>
-            <h2>{t.experiments.trend}</h2>
-            <p className="muted">{t.experiments.trendText}</p>
-          </div>
-          <span className="neutral-badge">
-            {experiment.source === "sample" ? t.common.sample : t.common.local}
-          </span>
-        </div>
-        {experiment.source === "sample" && (
-          <p className="field-hint">{t.experiments.sampleNotice}</p>
-        )}
+        <h2>{t.experiments.trend}</h2>
         <MetricChart experiment={analysisExperiment} />
       </Card>
       <ResultsComparison experiment={analysisExperiment} completed={progress.completed} />
