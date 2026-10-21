@@ -95,6 +95,7 @@ const previousNewExperimentSchema = z
   .strict();
 export const newExperimentSchema = previousNewExperimentSchema.extend({
   metrics: metricsSchema,
+  outcomeSource: z.literal("global").optional(),
 }) satisfies z.ZodType<NewExperiment>;
 const entryDraftSchema = z
   .object({

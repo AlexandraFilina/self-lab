@@ -40,7 +40,9 @@ export function buildDailyEntry(
   if (experiment.status === "completed" && !existing) throw new AppError("completedEntry");
   if (!existing && date < addDays(today, -1)) throw new AppError("recentEntryOnly");
   const timestamp = timestampSchema.parse(savedAt);
-  const parsed = getDailyEntrySchema(experiment.metrics).parse(draft);
+  const parsed = getDailyEntrySchema(
+    experiment.outcomeSource === "global" ? [] : experiment.metrics,
+  ).parse(draft);
   const values = Object.fromEntries(
     Object.entries(parsed.values).filter(([, value]) => value !== undefined),
   );

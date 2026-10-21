@@ -123,7 +123,9 @@ function EntryDialog({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (saving) return;
-    const result = getDailyEntrySchema(experiment.metrics).safeParse({ habitStatus, values, note });
+    const result = getDailyEntrySchema(
+      experiment.outcomeSource === "global" ? [] : experiment.metrics,
+    ).safeParse({ habitStatus, values, note });
     if (!result.success) {
       setError(result.error.issues[0].message);
       return;
@@ -161,7 +163,9 @@ function EntryDialog({
             <Icon name="close" />
           </Button>
         </div>
-        <h2 id="entry-title">{t.checkIn.title}</h2>
+        <h2 id="entry-title">
+          {experiment.outcomeSource === "global" ? t.checkIn.habitTitle : t.checkIn.title}
+        </h2>
         <p id="entry-description" className="muted">
           {experiment.title} · {formatDate(date, { day: "numeric", month: "long" })}
         </p>
@@ -214,23 +218,33 @@ function EntryDialog({
             ))}
           </fieldset>
           {existing?.habitStatus === null && <p className="field-hint">{t.checkIn.legacyStatus}</p>}
-          <p className="field-hint">{t.checkIn.scoresHelp}</p>
-          <div className="metric-sliders">
-            {experiment.metrics.map((metric) => (
-              <MetricSlider
-                key={metric.id}
-                metric={metric}
-                value={values[metric.id]}
-                onChange={(value) => setValues((current) => ({ ...current, [metric.id]: value }))}
-              />
-            ))}
-          </div>
+          {experiment.outcomeSource !== "global" && (
+            <>
+              <p className="field-hint">{t.checkIn.scoresHelp}</p>
+              <div className="metric-sliders">
+                {experiment.metrics.map((metric) => (
+                  <MetricSlider
+                    key={metric.id}
+                    metric={metric}
+                    value={values[metric.id]}
+                    onChange={(value) =>
+                      setValues((current) => ({ ...current, [metric.id]: value }))
+                    }
+                  />
+                ))}
+              </div>
+            </>
+          )}
           <label htmlFor="entry-note" className="field-label">
             {t.checkIn.noteLabel} <span className="optional">{t.common.optional}</span>
           </label>
           <Textarea
             id="entry-note"
-            placeholder={t.checkIn.notePlaceholder}
+            placeholder={
+              experiment.outcomeSource === "global"
+                ? t.checkIn.experimentNotePlaceholder
+                : t.checkIn.notePlaceholder
+            }
             value={note}
             maxLength={EXPERIMENT_LIMITS.note}
             onChange={(event) => setNote(event.target.value)}

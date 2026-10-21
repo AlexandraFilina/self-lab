@@ -30,6 +30,7 @@ export function toExperiment(
   return experimentSchema.parse({
     id: row.publicId,
     mode: row.mode,
+    ...(row.outcomeSource === "global" ? { outcomeSource: "global" } : {}),
     source: row.source,
     status: row.status,
     completedAt: isoTimestamp(row.completedAt),

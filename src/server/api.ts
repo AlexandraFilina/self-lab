@@ -29,7 +29,7 @@ export async function handleApi(
           ? 404
           : code === "payloadTooLarge"
             ? 413
-            : ["dataConflict", "importConflict", "lifecycleState"].includes(code)
+            : ["dataConflict", "importConflict", "lifecycleState", "metricDuplicate"].includes(code)
               ? 409
               : ["backendConfiguration", "databaseUnavailable", "serverUnavailable"].includes(code)
                 ? 503

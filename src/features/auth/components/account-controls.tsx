@@ -4,6 +4,7 @@ import Link from "next/link";
 import { t } from "@/i18n";
 import { Button, Card } from "@/components/ui";
 import { LocalImportNotice } from "@/components/local-import-notice";
+import { DailyMeasuresManager } from "@/features/reflections/components/daily-measures-manager";
 import { useClientReady } from "../use-client-ready";
 import { authClient } from "../client";
 export function SignOutButton({ compact = false }: { compact?: boolean }) {
@@ -106,6 +107,7 @@ export function AccountControls({
         )}
         <SignOutButton />
       </Card>
+      <DailyMeasuresManager />
       <LocalImportNotice />
     </>
   );

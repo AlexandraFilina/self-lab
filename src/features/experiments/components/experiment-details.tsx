@@ -12,9 +12,10 @@ import { ResultsComparison } from "./results-comparison";
 import { ExperimentLifecycle } from "./experiment-lifecycle";
 import { DailyObservations } from "./daily-observations";
 import { Card } from "@/components/ui";
+import { outcomeEntries } from "@/features/reflections/model/analytics";
 
 export function ExperimentDetails({ id }: { id: string }) {
-  const { experiments, referenceDate } = useExperiments();
+  const { experiments, referenceDate, reflections, globalMetrics } = useExperiments();
   const experiment = experiments.find((item) => item.id === id);
   if (!experiment)
     return (
@@ -30,6 +31,20 @@ export function ExperimentDetails({ id }: { id: string }) {
       </Card>
     );
   const progress = getProgress(experiment, referenceDate);
+  const displayExperiment =
+    experiment.outcomeSource === "global"
+      ? {
+          ...experiment,
+          metrics: experiment.metrics.map(
+            (metric) =>
+              globalMetrics.find((item) => item.definition.id === metric.id)?.definition ?? metric,
+          ),
+        }
+      : experiment;
+  const analysisExperiment = {
+    ...displayExperiment,
+    entries: outcomeEntries(displayExperiment, reflections),
+  };
   return (
     <>
       <Link href="/experiments" className="back-link">
@@ -120,9 +135,9 @@ export function ExperimentDetails({ id }: { id: string }) {
         {experiment.source === "sample" && (
           <p className="field-hint">{t.experiments.sampleNotice}</p>
         )}
-        <MetricChart experiment={experiment} />
+        <MetricChart experiment={analysisExperiment} />
       </Card>
-      <ResultsComparison experiment={experiment} completed={progress.completed} />
+      <ResultsComparison experiment={analysisExperiment} completed={progress.completed} />
       {experiment.legacy && (
         <Card className="legacy-card">
           <details className="legacy-disclosure">
@@ -137,7 +152,11 @@ export function ExperimentDetails({ id }: { id: string }) {
           </details>
         </Card>
       )}
-      <DailyObservations key={`${experiment.id}:${experiment.status}`} experiment={experiment} />
+      <DailyObservations
+        key={`${experiment.id}:${experiment.status}`}
+        experiment={displayExperiment}
+        outcomeEntries={analysisExperiment.entries}
+      />
     </>
   );
 }

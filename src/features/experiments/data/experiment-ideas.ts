@@ -34,7 +34,7 @@ export const EXPERIMENT_IDEAS: readonly ExperimentIdea[] = [
   {
     id: "focus_sessions",
     ...t.onboarding.ideas.focus_sessions,
-    metricIds: ["productivity"],
+    metricIds: ["focus"],
     durationDays: 14,
   },
 ];

@@ -9,10 +9,17 @@ import { NewExperimentForm } from "@/features/experiments/components/new-experim
 import { needsOnboarding } from "@/features/experiments/model/onboarding";
 import { getDailyWorkflow } from "../model/daily-workflow";
 import { TodaysCheckIns } from "./todays-check-ins";
+import { DailyReflectionCard } from "@/features/reflections/components/daily-reflection-card";
 
 export function Dashboard() {
   const { experiments, referenceDate } = useExperiments();
-  if (needsOnboarding(experiments)) return <NewExperimentForm onboarding />;
+  if (needsOnboarding(experiments))
+    return (
+      <>
+        <DailyReflectionCard key={referenceDate} />
+        <NewExperimentForm onboarding />
+      </>
+    );
   const workflow = getDailyWorkflow(experiments, referenceDate);
 
   return (
@@ -26,6 +33,7 @@ export function Dashboard() {
           </Link>
         </div>
       </div>
+      <DailyReflectionCard key={referenceDate} />
       {workflow.rows.length ? (
         <TodaysCheckIns workflow={workflow} />
       ) : (

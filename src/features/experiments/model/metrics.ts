@@ -15,6 +15,11 @@ export const METRICS: Record<
   mood: { ...t.metrics.mood, color: "#48a899" },
   productivity: { ...t.metrics.productivity, color: "#d39753" },
   energy: { ...t.metrics.energy, color: "#a27ab7" },
+  stress: { ...t.metrics.stress, color: "#c78877" },
+  focus: { ...t.metrics.focus, color: "#728fb8" },
+  anxiety: { ...t.metrics.anxiety, color: "#b78599" },
+  pain: { ...t.metrics.pain, color: "#a57c7a" },
+  motivation: { ...t.metrics.motivation, color: "#a19653" },
 };
 export function builtInMetric(id: BuiltInMetricId): BuiltInMetricDefinition {
   return { id, kind: "built_in", scale: { ...DEFAULT_NUMERIC_SCALE } };
@@ -26,9 +31,7 @@ export function metricColor(metric: MetricDefinition): string {
   return metric.kind === "built_in" ? METRICS[metric.id].color : "#a27ab7";
 }
 export function metricDescription(metric: MetricDefinition): string {
-  return metric.kind === "built_in"
-    ? METRICS[metric.id].description
-    : t.metrics.customDescription(metric.label);
+  return metric.kind === "built_in" ? METRICS[metric.id].description : t.metrics.customDescription;
 }
 export function normalizeMetricLabel(label: string): string {
   return label.trim().normalize("NFKC").toLowerCase();

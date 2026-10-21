@@ -1,4 +1,14 @@
-export const METRIC_IDS = ["sleep", "mood", "productivity", "energy"] as const;
+export const METRIC_IDS = [
+  "sleep",
+  "mood",
+  "productivity",
+  "energy",
+  "stress",
+  "focus",
+  "anxiety",
+  "pain",
+  "motivation",
+] as const;
 export type BuiltInMetricId = (typeof METRIC_IDS)[number];
 export type CustomMetricId = `custom_${string}`;
 export type MetricId = BuiltInMetricId | CustomMetricId;
@@ -51,6 +61,7 @@ export interface Experiment {
   habit: string;
   durationDays: number;
   metrics: MetricDefinition[];
+  outcomeSource?: "global";
   startDate: string;
   entries: DailyEntry[];
   source: "user" | "sample";
@@ -58,7 +69,7 @@ export interface Experiment {
 }
 export type NewExperiment = Pick<
   Experiment,
-  "title" | "question" | "habit" | "durationDays" | "metrics"
+  "title" | "question" | "habit" | "durationDays" | "metrics" | "outcomeSource"
 >;
 export interface DailyEntryDraft {
   habitStatus: HabitStatus;

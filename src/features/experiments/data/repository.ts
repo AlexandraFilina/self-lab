@@ -1,5 +1,11 @@
 import type { DailyEntryDraft, Experiment, NewExperiment } from "../model/types";
 import type { LifecycleIntent } from "../model/lifecycle";
+import type {
+  DailyReflection,
+  GlobalMetric,
+  GlobalMetricChange,
+  ReflectionDraft,
+} from "@/features/reflections/model/types";
 export interface WorkspaceSnapshotRepository {
   load(): Promise<Experiment[] | null>;
   save(experiments: readonly Experiment[]): Promise<void>;
@@ -24,6 +30,14 @@ export interface ImportResult {
   skipped: number;
 }
 export interface ExperimentsRepository {
+  listGlobalMetrics(): Promise<GlobalMetric[]>;
+  changeGlobalMetric(change: GlobalMetricChange): Promise<GlobalMetric[]>;
+  listReflections(): Promise<DailyReflection[]>;
+  saveReflection(input: {
+    observedDate: string;
+    timeZone: string;
+    draft: ReflectionDraft;
+  }): Promise<DailyReflection>;
   listExperiments(): Promise<Experiment[]>;
   getExperiment(id: string): Promise<Experiment>;
   createExperiment(input: CreateExperimentInput): Promise<Experiment>;

@@ -3,6 +3,7 @@ import { t } from "@/i18n";
 import { metricLabel, metricDescription } from "../model/metrics";
 import type { MetricDefinition } from "../model/types";
 import { Button } from "@/components/ui";
+import { sliderPosition, sliderTicks } from "../model/slider-geometry";
 
 export function MetricSlider({
   metric,
@@ -16,7 +17,9 @@ export function MetricSlider({
   const id = `score-${metric.id}`;
   const { min, max, step } = metric.scale;
   const midpoint = min + Math.floor((max - min) / step / 2) * step;
-  const levels = metric.kind === "custom" ? t.checkIn.customLevels : t.checkIn.levels;
+  const neutralScale =
+    metric.kind === "custom" || ["stress", "anxiety", "pain"].includes(metric.id);
+  const levels = neutralScale ? t.checkIn.customLevels : t.checkIn.levels;
   const level =
     value === undefined
       ? null
@@ -39,7 +42,7 @@ export function MetricSlider({
             <circle cx="12" cy="12" r="9" />
             <path
               d={
-                metric.kind === "custom"
+                neutralScale
                   ? "M7 15h10"
                   : level !== null && level >= 4
                     ? "M7 13q5 6 10 0"
@@ -63,33 +66,49 @@ export function MetricSlider({
       <p id={`${id}-description`} className="muted">
         {metricDescription(metric)}
       </p>
-      <input
-        id={id}
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value ?? midpoint}
-        onChange={(event) => onChange(Number(event.target.value))}
-        onPointerDown={() => {
-          if (value === undefined) onChange(midpoint);
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            onChange(value ?? midpoint);
-          }
-        }}
-        aria-describedby={`${id}-description`}
-        aria-valuetext={
-          value === undefined
-            ? t.checkIn.chooseScore(metricLabel(metric))
-            : t.checkIn.scoreText(value, description, max)
+      <div
+        className="metric-range"
+        style={
+          {
+            "--slider-progress": `${sliderPosition(value ?? min, metric.scale)}%`,
+          } as React.CSSProperties
         }
-      />
+      >
+        <span className="metric-range-track" aria-hidden="true" />
+        <input
+          id={id}
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value ?? midpoint}
+          onChange={(event) => onChange(Number(event.target.value))}
+          onPointerDown={() => {
+            if (value === undefined) onChange(midpoint);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onChange(value ?? midpoint);
+            }
+          }}
+          aria-describedby={`${id}-description`}
+          aria-valuetext={
+            value === undefined
+              ? t.checkIn.chooseScore(metricLabel(metric))
+              : t.checkIn.scoreText(value, description, max)
+          }
+        />
+      </div>
       <div className="metric-level-ticks" aria-hidden="true">
-        {levels.map((label, index) => (
-          <i key={label} className={index === level ? "level-active" : ""} />
+        {sliderTicks(metric.scale).map((tick) => (
+          <i
+            key={tick}
+            style={{
+              left: `calc(var(--slider-half-thumb) + (100% - var(--slider-thumb-size)) * ${sliderPosition(tick, metric.scale) / 100})`,
+            }}
+            className={tick === value ? "level-active" : ""}
+          />
         ))}
       </div>
       <div className="range-labels">
@@ -102,7 +121,7 @@ export function MetricSlider({
         >
           {t.checkIn.clear}
         </Button>
-        <span>{metric.kind === "custom" ? t.checkIn.scaleHighAmount : t.checkIn.scaleHigh}</span>
+        <span>{neutralScale ? t.checkIn.scaleHighAmount : t.checkIn.scaleHigh}</span>
       </div>
     </div>
   );

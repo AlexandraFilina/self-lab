@@ -51,6 +51,7 @@ export const experiments = pgTable(
       .notNull()
       .references(() => workspaces.id, { onDelete: "restrict" }),
     mode: varchar("mode", { length: 30 }).notNull().default("daily_habit"),
+    outcomeSource: varchar("outcome_source", { length: 20 }).notNull().default("scoped"),
     title: varchar("title", { length: 120 }).notNull(),
     question: varchar("question", { length: 600 }).notNull(),
     habit: varchar("habit", { length: 500 }).notNull(),
@@ -67,6 +68,7 @@ export const experiments = pgTable(
     unique("experiment_workspace_public_id").on(table.workspaceId, table.publicId),
     index("experiments_workspace_created").on(table.workspaceId, table.createdAt),
     check("experiment_mode", sql`${table.mode} = 'daily_habit'`),
+    check("experiment_outcome_source", sql`${table.outcomeSource} in ('scoped', 'global')`),
     check("experiment_source", sql`${table.source} = 'user'`),
     check("experiment_status", sql`${table.status} in ('active', 'completed')`),
     check(
@@ -192,4 +194,78 @@ export const localImports = pgTable(
     importedAt: instant("imported_at").defaultNow().notNull(),
   },
   (table) => [primaryKey({ columns: [table.workspaceId, table.fingerprint] })],
+);
+
+export const globalMetrics = pgTable(
+  "global_metrics",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "restrict" }),
+    metricId: varchar("metric_id", { length: 200 }).notNull(),
+    kind: varchar("kind", { length: 20 }).notNull(),
+    label: varchar("label", { length: 40 }).notNull(),
+    active: boolean("active").notNull().default(false),
+    scaleMin: integer("scale_min").notNull().default(1),
+    scaleMax: integer("scale_max").notNull().default(10),
+    scaleStep: integer("scale_step").notNull().default(1),
+  },
+  (table) => [
+    unique("global_metric_workspace_id").on(table.workspaceId, table.metricId),
+    unique("global_metric_row_workspace").on(table.id, table.workspaceId),
+    uniqueIndex("global_metric_workspace_label").on(
+      table.workspaceId,
+      sql`lower(trim(${table.label}))`,
+    ),
+    check("global_metric_kind", sql`${table.kind} in ('built_in', 'custom')`),
+    check("global_metric_label", sql`length(trim(${table.label})) > 0`),
+    check(
+      "global_metric_scale",
+      sql`${table.scaleMin} = 1 and ${table.scaleMax} = 10 and ${table.scaleStep} = 1`,
+    ),
+  ],
+);
+
+export const dailyReflections = pgTable(
+  "daily_reflections",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "restrict" }),
+    observedDate: date("observed_date", { mode: "string" }).notNull(),
+    note: varchar("note", { length: 500 }).notNull().default(""),
+    recordedAt: instant("recorded_at").defaultNow().notNull(),
+    updatedAt: instant("updated_at"),
+  },
+  (table) => [
+    unique("daily_reflection_workspace_date").on(table.workspaceId, table.observedDate),
+    unique("daily_reflection_row_workspace").on(table.id, table.workspaceId),
+  ],
+);
+
+export const dailyReflectionValues = pgTable(
+  "daily_reflection_values",
+  {
+    reflectionId: uuid("reflection_id").notNull(),
+    metricId: uuid("metric_id").notNull(),
+    workspaceId: uuid("workspace_id").notNull(),
+    value: doublePrecision("numeric_value").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.reflectionId, table.metricId] }),
+    foreignKey({
+      columns: [table.reflectionId, table.workspaceId],
+      foreignColumns: [dailyReflections.id, dailyReflections.workspaceId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.metricId, table.workspaceId],
+      foreignColumns: [globalMetrics.id, globalMetrics.workspaceId],
+    }).onDelete("restrict"),
+    check(
+      "daily_reflection_value_score",
+      sql`${table.value} between 1 and 10 and ${table.value} = floor(${table.value})`,
+    ),
+  ],
 );

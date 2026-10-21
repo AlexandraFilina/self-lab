@@ -64,7 +64,7 @@ Local development continues to use Docker PostgreSQL and Mailpit. In a deployed 
 
 ## Existing local data
 
-Open the same browser and origin that held your old experiments. When valid user experiments exist under `self-lab:experiments`, a **Move your local experiments to your account** action appears. It imports only after you click it.
+Open Account → Data in the same browser and origin that held your old experiments. When valid user experiments exist under `self-lab:experiments`, **Import local experiments** becomes available. It imports only after you click it.
 
 Supported local versions 1–5 are decoded without changing the original browser value. IDs, dates, entries, custom definitions, lifecycle history, and known save/edit timestamps are preserved; unknown timestamps remain null. Fictional samples are excluded. The destination is derived only from the current server session. Each account has separate import receipts. The import is transactional and stores a receipt so the same backup is not imported repeatedly, even after server-side edits. Conflicting existing IDs reject the entire batch; they never overwrite server data.
 
@@ -87,6 +87,7 @@ Authenticated user / ExperimentsProvider
 - `src/server/db`: typed normalized schema and server-only connection pool.
 - `src/server/experiments`: scoped operations, transactions, and explicit domain mapping.
 - `src/features/experiments/model`: existing types, Zod rules, lifecycle, and analytics.
+- `src/features/reflections`: user-owned daily measures, daily reflection validation, UI, and the outcome join used by new experiments.
 - `src/features/experiments/data`: HTTP repository, explicit local import, legacy compatibility, and sample fixtures.
 - `src/features/experiments/context`: post-mount loading, serialized operations, local calendar clock, and confirmed server results.
 - `src/i18n`: typed English system copy; custom names remain user content.
@@ -94,7 +95,9 @@ Authenticated user / ExperimentsProvider
 - `tests/integration`: real PostgreSQL repository tests.
 - `tests/browser`: real headless Chrome through CDP, HTTP API, and test PostgreSQL.
 
-The database uses separate Better Auth user/session/account/verification/rate-limit tables, owned workspaces, experiments, metric definitions, daily entries, metric values, extension history, and import receipts. A physical UNIQUE constraint on experiment/date prevents duplicate check-ins. `observed_date` is SQL DATE, while save/edit/completion instants are timestamptz. SQL values are parameterized; database credentials and the driver stay on the server.
+The database uses separate Better Auth user/session/account/verification/rate-limit tables, owned workspaces, experiments, metric definitions, daily entries, metric values, extension history, import receipts, global metrics, daily reflections, and daily reflection values. Physical UNIQUE constraints prevent duplicate experiment/date check-ins and workspace/date reflections. `observed_date` is SQL DATE, while save/edit/completion instants are timestamptz. SQL values are parameterized; database credentials and the driver stay on the server.
+
+New experiments use `outcome_source = global`: their check-ins store only Done/Not done and an optional habit-specific note. Selected outcome IDs refer to reusable workspace daily measures; comparison joins reflections by observed date and counts only dates with an experiment check-in. Missing reflections or scores remain missing. Existing and imported experiments keep `outcome_source = scoped` and their original per-experiment metric values. No old scores are copied into daily reflections, since their original meaning may differ. Custom global measures retain stable IDs when renamed or deactivated, and historical reflection values are never deleted by those actions.
 
 See [ARCHITECTURE.md](docs/ARCHITECTURE.md), [PRODUCT.md](docs/PRODUCT.md), [AGENTS.md](AGENTS.md), and [third-party notices](THIRD_PARTY_NOTICES.md).
 

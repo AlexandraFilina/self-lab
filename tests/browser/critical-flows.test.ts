@@ -14,6 +14,8 @@ import {
   authVerifications,
   experiments,
   localImports,
+  dailyReflections,
+  globalMetrics,
   workspaces,
 } from "../../src/server/db/schema";
 import {
@@ -62,7 +64,10 @@ class Browser {
     }
   >();
   readonly errors: string[] = [];
-  constructor(private socket: WebSocket) {
+  constructor(
+    private socket: WebSocket,
+    private commandTimeout = 10000,
+  ) {
     socket.addEventListener("message", (event) => {
       const message = JSON.parse(String(event.data)) as ProtocolMessage;
       if (message.id) {
@@ -98,7 +103,7 @@ class Browser {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`Browser command timed out: ${method}`));
-      }, 10000);
+      }, this.commandTimeout);
       this.pending.set(id, { resolve, reject, timer });
       this.socket.send(JSON.stringify({ id, method, params }));
     }) as Promise<T>;
@@ -115,7 +120,7 @@ class Browser {
     return result.result.value;
   }
   async wait(expression: string) {
-    await retry(() => this.evaluate<boolean>(expression));
+    await retry(() => this.evaluate<boolean>(expression), Math.max(20000, this.commandTimeout * 2));
   }
   async click(text: string, selector = "button") {
     const point = await this.evaluate<{ x: number; y: number }>(
@@ -172,7 +177,7 @@ class Browser {
 
 test(
   "real browser → HTTP API → PostgreSQL: creation, check-ins, lifecycle, import, and responsive UI",
-  { timeout: 240000 },
+  { timeout: process.env.SELF_LAB_TEST_DEV === "1" ? 480000 : 240000 },
   async () => {
     const executable = [
       process.env.SELF_LAB_CHROME_PATH,
@@ -267,7 +272,18 @@ test(
         if (server.exitCode !== null) throw new Error(serverLog);
         return (await fetch(base + "/dashboard")).ok;
       }, 60000);
-      const page = new Browser(socket);
+      if (development) {
+        const experimentId = randomUUID();
+        for (const path of [
+          `/api/experiments/${experimentId}/entries`,
+          `/api/experiments/${experimentId}/lifecycle`,
+          "/api/imports",
+          "/api/imports/status",
+        ]) {
+          await fetch(base + path, { method: "OPTIONS" });
+        }
+      }
+      const page = new Browser(socket, development ? 60000 : 10000);
       browser = page;
       await page.send("Runtime.enable");
       await page.send("Page.enable");
@@ -368,6 +384,32 @@ test(
 
       assert.deepEqual(await repository.listExperiments(), []);
       assert.equal(await page.evaluate("localStorage.getItem('self-lab:experiments')"), null);
+      await page.wait("!!globalThis.__q('#score-mood')&&!!globalThis.__q('#score-energy')");
+      await page.score("mood", 7);
+      await page.score("energy", 6);
+      await page.click("Save reflection");
+      await page.wait(
+        "globalThis.__q('.daily-reflection-summary')?.textContent.includes('Mood · 7/10')",
+      );
+      assert.equal((await repository.listReflections()).length, 1);
+      await navigate("/dashboard", onboardingHeading);
+      assert.ok(await page.evaluate("!!globalThis.__q('.daily-reflection-summary')"));
+      await navigate("/account", "Account");
+      await page.wait(
+        "globalThis.__qa('#daily-measures button').some(button=>button.textContent.trim()==='+ Add custom measure'&&!button.disabled)",
+      );
+      await page.click("+ Add custom measure");
+      await page.wait("!!globalThis.__q('#new-measure')");
+      await page.fill("#new-measure", "Restfulness");
+      await page.wait(
+        "globalThis.__qa('#daily-measures button').some(button=>button.textContent.trim()==='Add measure'&&!button.disabled)",
+      );
+      await page.click("Add measure");
+      await page.wait("document.body.textContent.includes('Restfulness')");
+      const customGlobal = (await repository.listGlobalMetrics()).find(
+        (item) => item.definition.kind === "custom",
+      )!;
+      await navigate("/dashboard", onboardingHeading);
       assert.equal(
         await page.evaluate("globalThis.__q('#onboarding-experiment-question').value"),
         "",
@@ -387,9 +429,9 @@ test(
         "globalThis.__q('form [role=alert]')?.textContent==='Choose at least one metric to track.'",
       );
       await page.evaluate("globalThis.__q('input[name=metrics][value=mood]').click()");
-      await page.click("+ Add custom metric");
-      await page.fill("#onboarding-custom-metric-name", "Focus");
-      await page.click("Add metric");
+      await page.evaluate(
+        `globalThis.__q('input[name=metrics][value="${customGlobal.definition.id}"]').click()`,
+      );
       // Lose the first response AFTER the server commits. Retrying must reuse the creation ID.
       await page.evaluate(`globalThis.__originalFetch=globalThis.fetch; globalThis.__loseResponse=true;
         globalThis.fetch=async (...args)=>{const response=await globalThis.__originalFetch(...args);globalThis.__lastStatus=response.status;
@@ -409,7 +451,8 @@ test(
       const firstId = (await page.evaluate<string>("location.pathname")).split("/").at(-1)!;
       let first = await repository.getExperiment(firstId);
       const custom = first.metrics.find((metric) => metric.kind === "custom")!;
-      assert.equal(custom.kind === "custom" ? custom.label : "", "Focus");
+      assert.equal(custom.kind === "custom" ? custom.label : "", "Restfulness");
+      assert.equal(first.outcomeSource, "global");
       assert.equal(first.entries.length, 0);
       const today = await page.evaluate<string>(
         "(()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`})()",
@@ -420,17 +463,16 @@ test(
       assert.deepEqual(await repository.getExperiment(firstId), first);
       await page.click("Check in today");
       await page.dialogOpen();
-      assert.ok(await page.evaluate(`!!globalThis.__q('#score-${custom.id}')`));
+      assert.ok(await page.evaluate("!globalThis.__q('dialog input[type=range]')"));
       await page.evaluate("globalThis.__q('input[name=habitStatus][value=done]').click()");
-      await page.score("mood", 7);
-      await page.score(custom.id, 6);
       await page.fill("#entry-note", "Read a chapter");
       await page.click("Save check-in");
       await page.wait("!globalThis.__q('dialog')");
       first = await repository.getExperiment(firstId);
       const originalEntry = first.entries[0];
       assert.equal(originalEntry.observedDate, today);
-      assert.equal(originalEntry.values[custom.id], 6);
+      assert.deepEqual(originalEntry.values, {});
+      assert.equal((await repository.listReflections())[0].values.mood, 7);
       assert.equal(originalEntry.habitStatus, "done");
       await page.wait(
         "document.body.textContent.includes('1 observation recorded. Add more check-ins to see a trend.')",
@@ -443,18 +485,16 @@ test(
       await page.click("Edit check-in");
       await page.dialogOpen();
       assert.equal(await page.evaluate("globalThis.__q('#entry-note').value"), "Read a chapter");
-      const [parent] = await db.select().from(experiments).where(eq(experiments.publicId, firstId));
       const suffix = randomUUID().replaceAll("-", "");
       const fn = `browser_fail_score_${suffix}`,
         trigger = `browser_fail_trigger_${suffix}`;
       await pool.query(
-        `CREATE FUNCTION ${fn}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.experiment_id = '${parent.id}'::uuid AND NEW.numeric_value = 9 THEN RAISE EXCEPTION 'Deliberate database failure'; END IF; RETURN NEW; END $$`,
+        `CREATE FUNCTION ${fn}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.note = 'Keep input after failed save' THEN RAISE EXCEPTION 'Deliberate database failure'; END IF; RETURN NEW; END $$`,
       );
       await pool.query(
-        `CREATE TRIGGER ${trigger} BEFORE INSERT ON daily_entry_values FOR EACH ROW EXECUTE FUNCTION ${fn}()`,
+        `CREATE TRIGGER ${trigger} BEFORE UPDATE ON daily_entries FOR EACH ROW EXECUTE FUNCTION ${fn}()`,
       );
       try {
-        await page.score(custom.id, 9);
         await page.fill("#entry-note", "Keep input after failed save");
         await page.click("Save check-in");
         await page.wait(
@@ -464,13 +504,11 @@ test(
           await page.evaluate("globalThis.__q('#entry-note').value"),
           "Keep input after failed save",
         );
-        assert.equal(await page.evaluate(`globalThis.__q('#score-${custom.id}').value`), "9");
         assert.deepEqual(await repository.getExperiment(firstId), first);
       } finally {
-        await pool.query(`DROP TRIGGER ${trigger} ON daily_entry_values`);
+        await pool.query(`DROP TRIGGER ${trigger} ON daily_entries`);
         await pool.query(`DROP FUNCTION ${fn}()`);
       }
-      await page.score(custom.id, 8);
       await page.fill("#entry-note", "Edited saved observation");
       await page.click("Save check-in");
       await page.wait("!globalThis.__q('dialog')");
@@ -479,7 +517,7 @@ test(
       assert.equal(first.entries[0].id, originalEntry.id);
       assert.equal(first.entries[0].recordedAt, originalEntry.recordedAt);
       assert.ok(first.entries[0].updatedAt);
-      assert.equal(first.entries[0].values[custom.id], 8);
+      assert.deepEqual(first.entries[0].values, {});
 
       await page.click("Experiments", ".nav-link");
       await page.wait("!!globalThis.__q('.filter-tabs')");
@@ -491,6 +529,7 @@ test(
       await page.click("Continue");
       await page.wait("!!globalThis.__q('#experiment-title')");
       await page.fill("#experiment-title", "Afternoon coffee");
+      await page.evaluate("globalThis.__q('input[name=metrics][value=mood]').click()");
       await page.click("Create experiment");
       await page.wait("globalThis.__q('h1')?.textContent==='Afternoon coffee'");
       const secondId = (await page.evaluate<string>("location.pathname")).split("/").at(-1)!;
@@ -535,7 +574,6 @@ test(
       await page.click("Check in", `.daily-workflow-row[data-experiment-id="${secondId}"] button`);
       await page.dialogOpen();
       await page.evaluate("globalThis.__q('input[name=habitStatus][value=not_done]').click()");
-      await page.score("sleep", 5);
       await page.click("Save check-in");
       await page.wait(
         "!globalThis.__q('dialog')&&globalThis.__q('.daily-workflow-summary')?.textContent==='2 of 2 checked in today'",
@@ -557,6 +595,35 @@ test(
       assert.equal(
         await page.evaluate("globalThis.__q('.daily-workflow-summary').textContent"),
         "2 of 2 checked in today",
+      );
+      const reflectionBeforeEdit = (await repository.listReflections())[0];
+      await page.click("Edit", ".daily-reflection button");
+      await page.wait("!!globalThis.__q('.daily-reflection #score-mood')");
+      await page.score("mood", 5);
+      await page.click("Save reflection");
+      await page.wait(
+        "globalThis.__q('.daily-reflection-summary')?.textContent.includes('Mood · 5/10')",
+      );
+      const reflectionAfterEdit = (await repository.listReflections())[0];
+      assert.equal((await repository.listReflections()).length, 1);
+      assert.equal(reflectionAfterEdit.id, reflectionBeforeEdit.id);
+      assert.equal(reflectionAfterEdit.recordedAt, reflectionBeforeEdit.recordedAt);
+      assert.ok(reflectionAfterEdit.updatedAt);
+      await navigate(`/experiments/${firstId}`, "Reading and focus");
+      await page.click("How was this calculated?", "summary");
+      await page.wait("!!globalThis.__q('.comparison-table tbody tr:first-child td strong')");
+      assert.ok(
+        await page.evaluate(
+          "globalThis.__q('.comparison-table tbody tr:first-child td strong')?.textContent.includes('5 / 10')",
+        ),
+      );
+      await navigate(`/experiments/${secondId}`, "Afternoon coffee");
+      await page.click("How was this calculated?", "summary");
+      await page.wait("!!globalThis.__q('.comparison-table tbody tr')");
+      assert.ok(
+        await page.evaluate(
+          "globalThis.__qa('.comparison-table tbody tr').some(row=>row.textContent.includes('Mood')&&row.textContent.includes('5 / 10'))",
+        ),
       );
 
       await navigate(`/experiments/${firstId}`, "Reading and focus");
@@ -680,6 +747,7 @@ test(
       assert.ok(!(await repository.listExperiments()).some((item) => item.source === "sample"));
       for (const [route, heading] of [
         ["/dashboard", "Hello, curious mind"],
+        ["/account", "Account"],
         ["/experiments", "My experiments"],
         ["/experiments/new", "Start with curiosity"],
         [`/experiments/${firstId}`, "Reading and focus"],
@@ -777,8 +845,23 @@ test(
       const userB = await register(emailB);
       assert.notEqual(userA.id, userB.id);
       assert.deepEqual(await repository.listExperiments(), []);
+      assert.deepEqual(await repository.listReflections(), []);
+      assert.ok(
+        !(await repository.listGlobalMetrics()).some((item) => item.definition.id === custom.id),
+      );
       await navigate(`/experiments/${firstId}`, "Experiment not found");
       const cookieB = await browserCookie();
+      const foreignMeasure = await fetch(base + "/api/daily-reflections", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Cookie: cookieB },
+        body: JSON.stringify({
+          observedDate: today,
+          timeZone: timezone,
+          draft: { values: { [custom.id]: 7 } },
+        }),
+      });
+      assert.equal(foreignMeasure.status, 400);
+      assert.deepEqual(await repository.listReflections(), []);
       for (const [method, path, body] of [
         ["GET", `/api/experiments/${firstId}`, undefined],
         [
@@ -815,7 +898,8 @@ test(
         body: JSON.stringify({ workspaceId, experiments: [imported] }),
       });
       assert.equal(fakeOwner.status, 400);
-      assert.equal((await repositoryA.getExperiment(firstId)).entries[0].values[custom.id], 8);
+      assert.deepEqual((await repositoryA.getExperiment(firstId)).entries[0].values, {});
+      assert.equal((await repositoryA.listReflections())[0].values.mood, 5);
       await navigate("/account", "Account");
       await signOut();
       await navigate("/forgot-password", "Reset your password");
@@ -905,6 +989,8 @@ test(
       const workspaceIds = [...testWorkspaces];
       await db.delete(experiments).where(inArray(experiments.workspaceId, workspaceIds));
       await db.delete(localImports).where(inArray(localImports.workspaceId, workspaceIds));
+      await db.delete(dailyReflections).where(inArray(dailyReflections.workspaceId, workspaceIds));
+      await db.delete(globalMetrics).where(inArray(globalMetrics.workspaceId, workspaceIds));
       await db.delete(workspaces).where(inArray(workspaces.id, workspaceIds));
       if (testUsers.length) {
         await db.delete(authVerifications).where(inArray(authVerifications.value, testUsers));

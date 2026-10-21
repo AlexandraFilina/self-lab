@@ -15,6 +15,13 @@
       "when": 1792032011118,
       "tag": "0001_cool_viper",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792605090661,
+      "tag": "0002_unknown_khan",
+      "breakpoints": true
     }
   ]
 }

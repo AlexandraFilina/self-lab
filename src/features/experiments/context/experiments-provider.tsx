@@ -18,9 +18,17 @@ import { readLocalExperiments } from "../data/local-import";
 import { createSampleExperiments } from "../data/mock-experiments";
 import type { ExperimentsRepository } from "../data/repository";
 import type { DailyEntryDraft, Experiment, NewExperiment } from "../model/types";
+import type {
+  DailyReflection,
+  GlobalMetric,
+  GlobalMetricChange,
+  ReflectionDraft,
+} from "@/features/reflections/model/types";
 
 interface ExperimentsContextValue {
   experiments: Experiment[];
+  globalMetrics: GlobalMetric[];
+  reflections: DailyReflection[];
   referenceDate: string;
   status: "loading" | "ready" | "error";
   error: string | null;
@@ -32,6 +40,8 @@ interface ExperimentsContextValue {
   reload: () => void;
   createExperiment: (draft: NewExperiment, requestId?: string) => Promise<string>;
   saveEntry: (experimentId: string, entry: DailyEntryDraft, date?: string) => Promise<void>;
+  saveReflection: (draft: ReflectionDraft, date?: string) => Promise<void>;
+  changeGlobalMetric: (change: GlobalMetricChange) => Promise<void>;
   changeLifecycle: (
     experimentId: string,
     intent: LifecycleIntent,
@@ -49,6 +59,8 @@ function withSamples(saved: Experiment[], today: string) {
 }
 export function ExperimentsProvider({ children }: { children: ReactNode }) {
   const [experiments, setExperiments] = useState<Experiment[]>([]);
+  const [globalMetrics, setGlobalMetrics] = useState<GlobalMetric[]>([]);
+  const [reflections, setReflections] = useState<DailyReflection[]>([]);
   const [referenceDate, setReferenceDate] = useState("");
   const [status, setStatus] = useState<ExperimentsContextValue["status"]>("loading");
   const [error, setError] = useState<string | null>(null);
@@ -67,12 +79,18 @@ export function ExperimentsProvider({ children }: { children: ReactNode }) {
     async function load() {
       const adapter = createHttpRepository();
       try {
-        const saved = await adapter.listExperiments();
+        const [saved, metrics, daily] = await Promise.all([
+          adapter.listExperiments(),
+          adapter.listGlobalMetrics(),
+          adapter.listReflections(),
+        ]);
         if (cancelled) return;
         const today = localDate();
         repository.current = adapter;
         current.current = withSamples(saved, today);
         setExperiments(current.current);
+        setGlobalMetrics(metrics);
+        setReflections(daily);
         setReferenceDate(today);
         setError(null);
         setStatus("ready");
@@ -118,6 +136,8 @@ export function ExperimentsProvider({ children }: { children: ReactNode }) {
     localCandidates.current = [];
     setLocalImportCount(0);
     setLocalImportError(null);
+    setGlobalMetrics([]);
+    setReflections([]);
     setLoadVersion((version) => version + 1);
   }, []);
   const commit = useCallback(
@@ -160,6 +180,7 @@ export function ExperimentsProvider({ children }: { children: ReactNode }) {
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       );
+      if (repository.current) setGlobalMetrics(await repository.current.listGlobalMetrics());
       return id;
     },
     [commit],
@@ -195,6 +216,50 @@ export function ExperimentsProvider({ children }: { children: ReactNode }) {
     },
     [commit, assertUser],
   );
+  const saveReflection = useCallback(async (draft: ReflectionDraft, date = localDate()) => {
+    pendingCount.current++;
+    setPending(true);
+    const task = queue.current.then(async () => {
+      const adapter = repository.current;
+      if (!adapter) throw new AppError("loading");
+      const saved = await adapter.saveReflection({
+        observedDate: date,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        draft,
+      });
+      setReflections((current) => [saved, ...current.filter((item) => item.observedDate !== date)]);
+      setReferenceDate(localDate());
+    });
+    queue.current = task.then(
+      () => undefined,
+      () => undefined,
+    );
+    try {
+      await task;
+    } finally {
+      pendingCount.current--;
+      setPending(pendingCount.current > 0);
+    }
+  }, []);
+  const changeGlobalMetric = useCallback(async (change: GlobalMetricChange) => {
+    pendingCount.current++;
+    setPending(true);
+    const task = queue.current.then(async () => {
+      const adapter = repository.current;
+      if (!adapter) throw new AppError("loading");
+      setGlobalMetrics(await adapter.changeGlobalMetric(change));
+    });
+    queue.current = task.then(
+      () => undefined,
+      () => undefined,
+    );
+    try {
+      await task;
+    } finally {
+      pendingCount.current--;
+      setPending(pendingCount.current > 0);
+    }
+  }, []);
   const importLocalExperiments = useCallback(async () => {
     if (pendingCount.current || !localCandidates.current.length) return;
     pendingCount.current++;
@@ -230,6 +295,8 @@ export function ExperimentsProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       experiments,
+      globalMetrics,
+      reflections,
       referenceDate,
       status,
       error,
@@ -237,6 +304,8 @@ export function ExperimentsProvider({ children }: { children: ReactNode }) {
       reload,
       createExperiment,
       saveEntry,
+      saveReflection,
+      changeGlobalMetric,
       changeLifecycle,
       localImportCount,
       localImportError,
@@ -245,6 +314,8 @@ export function ExperimentsProvider({ children }: { children: ReactNode }) {
     }),
     [
       experiments,
+      globalMetrics,
+      reflections,
       referenceDate,
       status,
       error,
@@ -252,6 +323,8 @@ export function ExperimentsProvider({ children }: { children: ReactNode }) {
       reload,
       createExperiment,
       saveEntry,
+      saveReflection,
+      changeGlobalMetric,
       changeLifecycle,
       localImportCount,
       localImportError,

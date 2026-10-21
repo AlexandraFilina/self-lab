@@ -3,6 +3,7 @@ import { AppError } from "@/lib/errors";
 import { t, type ErrorCode } from "@/i18n";
 import { experimentSchema } from "../model/schemas";
 import type { ExperimentsRepository } from "./repository";
+import { dailyReflectionSchema, globalMetricSchema } from "@/features/reflections/model/schemas";
 function isErrorCode(value: unknown): value is ErrorCode {
   return typeof value === "string" && Object.hasOwn(t.errors, value);
 }
@@ -35,6 +36,11 @@ export function createHttpRepository(): ExperimentsRepository {
     return result.data;
   }
   return {
+    listGlobalMetrics: () => request("/global-metrics", z.array(globalMetricSchema)),
+    changeGlobalMetric: (change) =>
+      request("/global-metrics", z.array(globalMetricSchema), "PATCH", change),
+    listReflections: () => request("/daily-reflections", z.array(dailyReflectionSchema)),
+    saveReflection: (input) => request("/daily-reflections", dailyReflectionSchema, "PUT", input),
     listExperiments: () => request("/experiments", z.array(experimentSchema)),
     getExperiment: (id) => request(`/experiments/${encodeURIComponent(id)}`, experimentSchema),
     createExperiment: (input) => request("/experiments", experimentSchema, "POST", input),

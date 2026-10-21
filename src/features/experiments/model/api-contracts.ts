@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { t } from "@/i18n";
 import { dateSchema, experimentSchema, newExperimentSchema } from "./schemas";
 export const publicIdSchema = z.string().min(1).max(200);
 export const timeZoneSchema = z
@@ -51,10 +52,11 @@ export const importRequestSchema = z
         experimentSchema.superRefine((experiment, context) => {
           if (
             experiment.source !== "user" ||
+            experiment.outcomeSource === "global" ||
             experiment.id.length > 200 ||
             experiment.entries.some((entry) => entry.id.length > 200)
           )
-            context.addIssue({ code: "custom", message: "Invalid user import." });
+            context.addIssue({ code: "custom", message: t.validation.importWorkspace });
         }),
       )
       .max(100),

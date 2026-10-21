@@ -3,14 +3,23 @@
 import { useCallback } from "react";
 import { t } from "@/i18n";
 import { formatCount, formatDate } from "@/lib/format";
-import type { Experiment } from "../model/types";
+import type { DailyEntry, Experiment } from "../model/types";
 import { metricLabel } from "../model/metrics";
 import { DailyEntryButton } from "./daily-entry";
 import { Icon } from "@/components/icon";
 import { Card, cn } from "@/components/ui";
 
-export function DailyObservations({ experiment }: { experiment: Experiment }) {
+export function DailyObservations({
+  experiment,
+  outcomeEntries,
+}: {
+  experiment: Experiment;
+  outcomeEntries?: DailyEntry[];
+}) {
   const completed = experiment.status === "completed";
+  const outcomesByDate = new Map(
+    outcomeEntries?.map((entry) => [entry.observedDate, entry.values]),
+  );
   const resetDisclosure = useCallback((element: HTMLDetailsElement | null) => {
     return () => {
       if (element) element.open = false;
@@ -61,11 +70,12 @@ export function DailyObservations({ experiment }: { experiment: Experiment }) {
                 </td>
                 {experiment.metrics.map((metric) => (
                   <td key={metric.id}>
-                    {entry.values[metric.id] === undefined ? (
+                    {(outcomesByDate.get(entry.observedDate) ?? entry.values)[metric.id] ===
+                    undefined ? (
                       "—"
                     ) : (
                       <>
-                        {entry.values[metric.id]}
+                        {(outcomesByDate.get(entry.observedDate) ?? entry.values)[metric.id]}
                         <span className="score-denominator"> / {metric.scale.max}</span>
                       </>
                     )}
