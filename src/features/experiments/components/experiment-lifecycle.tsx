@@ -12,7 +12,7 @@ import { extendedDuration } from "../model/lifecycle";
 import type { Experiment } from "../model/types";
 import { useExperiments } from "../context/experiments-provider";
 
-type DialogAction = "finish" | "extend";
+type DialogAction = "finish" | "extend" | "reopen";
 
 export function ExperimentLifecycle({
   experiment,
@@ -26,7 +26,6 @@ export function ExperimentLifecycle({
   const { referenceDate, changeLifecycle, pending } = useExperiments();
   const router = useRouter();
   const [action, setAction] = useState<DialogAction | null>(null);
-  const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
   const progress = getProgress(experiment, referenceDate);
   async function confirm(additionalDays: number | undefined, requestId: string) {
@@ -34,27 +33,27 @@ export function ExperimentLifecycle({
       experiment.id,
       action === "extend"
         ? { type: "extend", additionalDays: additionalDays ?? 0 }
-        : { type: "finish" },
+        : action === "reopen"
+          ? { type: "reopen" }
+          : { type: "finish" },
       requestId,
     );
     setAction(null);
     if (action === "finish") router.push(`/experiments/${experiment.id}#results`);
-    else setFeedback(t.lifecycle.extended);
-  }
-  async function reopen() {
-    setError("");
-    try {
-      await changeLifecycle(experiment.id, { type: "reopen" });
-      setFeedback(t.lifecycle.reopened);
-    } catch (cause) {
-      setError(errorMessage(cause));
-    }
+    else setFeedback(action === "reopen" ? t.lifecycle.reopened : t.lifecycle.extended);
   }
   if (experiment.source === "sample") return null;
   const content = (
     <>
       {experiment.status === "completed" ? (
-        <Button variant="secondary" disabled={pending} onClick={reopen}>
+        <Button
+          variant="secondary"
+          disabled={pending}
+          onClick={() => {
+            setFeedback("");
+            setAction("reopen");
+          }}
+        >
           {t.lifecycle.reopen}
         </Button>
       ) : progress.windowComplete && !compact ? (
@@ -94,11 +93,6 @@ export function ExperimentLifecycle({
         >
           {t.lifecycle.finish}
         </Button>
-      )}
-      {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
       )}
       {feedback && (
         <p className="field-hint" role="status">
@@ -193,10 +187,15 @@ function LifecycleDialog({
     >
       <div className="dialog-content">
         <h2 id={titleId}>
-          {action === "finish" ? t.lifecycle.finishConfirm : t.lifecycle.extendTitle}
+          {action === "finish"
+            ? t.lifecycle.finishConfirm
+            : action === "reopen"
+              ? t.lifecycle.reopenConfirm
+              : t.lifecycle.extendTitle}
         </h2>
         <p className="muted">{experiment.title}</p>
         {action === "finish" && <p className="field-hint">{t.lifecycle.finishDescription}</p>}
+        {action === "reopen" && <p className="field-hint">{t.lifecycle.reopenHelp}</p>}
         <form noValidate onSubmit={submit}>
           {action === "finish" ? (
             <>
@@ -216,7 +215,7 @@ function LifecycleDialog({
               </div>
               <p className="field-hint">{t.lifecycle.finishHelp}</p>
             </>
-          ) : (
+          ) : action === "extend" ? (
             <>
               <p className="field-hint">{t.lifecycle.extendHelp}</p>
               <fieldset className="habit-options">
@@ -265,7 +264,7 @@ function LifecycleDialog({
               )}
               <p className="field-hint">{t.lifecycle.targetLimit}</p>
             </>
-          )}
+          ) : null}
           {error && (
             <p className="form-error" role="alert">
               {error}
@@ -280,7 +279,9 @@ function LifecycleDialog({
                 ? t.lifecycle.saving
                 : action === "finish"
                   ? t.lifecycle.finishResults
-                  : t.lifecycle.extend}
+                  : action === "reopen"
+                    ? t.lifecycle.reopenAction
+                    : t.lifecycle.extend}
             </Button>
           </div>
         </form>

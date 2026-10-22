@@ -65,10 +65,8 @@ export function ExperimentDetails({ id }: { id: string }) {
           </p>
         </div>
         <div className="detail-actions">
-          <DailyEntryButton experiment={experiment} />
-          {experiment.status === "active" && (
-            <ExperimentLifecycle experiment={experiment} compact />
-          )}
+          {experiment.status === "active" && <DailyEntryButton experiment={experiment} />}
+          <ExperimentLifecycle experiment={experiment} compact />
         </div>
       </div>
       <Card className="detail-overview-card">
@@ -85,7 +83,7 @@ export function ExperimentDetails({ id }: { id: string }) {
         <ExperimentProgress experiment={experiment} />
         <p className="muted">{t.experiments.observationCount(progress.recorded)}</p>
       </Card>
-      {(progress.completed || progress.windowComplete) && (
+      {!progress.completed && progress.windowComplete && (
         <ExperimentLifecycle experiment={experiment} />
       )}
       <Card className="detail-chart-card">

@@ -197,6 +197,14 @@ test("real PostgreSQL authentication, sessions, reset, verification and user iso
       requestId: randomUUID(),
       timeZone: "UTC",
     });
+    await assert.rejects(
+      repoB.changeLifecycle(id, {
+        intent: { type: "reopen" },
+        requestId: randomUUID(),
+        timeZone: "UTC",
+      }),
+      coded("experimentMissing"),
+    );
     await repoA.changeLifecycle(id, {
       intent: { type: "reopen" },
       requestId: randomUUID(),

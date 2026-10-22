@@ -9,6 +9,7 @@ import { NewExperimentForm } from "@/features/experiments/components/new-experim
 import { needsOnboarding } from "@/features/experiments/model/onboarding";
 import { getDailyWorkflow } from "../model/daily-workflow";
 import { TodaysCheckIns } from "./todays-check-ins";
+import { DashboardTrends } from "./dashboard-trends";
 import { DailyReflectionCard } from "@/features/reflections/components/daily-reflection-card";
 
 export function Dashboard() {
@@ -18,6 +19,7 @@ export function Dashboard() {
       <>
         <DailyReflectionCard key={referenceDate} />
         <NewExperimentForm onboarding />
+        <DashboardTrends />
       </>
     );
   const workflow = getDailyWorkflow(experiments, referenceDate);
@@ -49,6 +51,7 @@ export function Dashboard() {
           </Link>
         </Card>
       )}
+      <DashboardTrends />
     </>
   );
 }

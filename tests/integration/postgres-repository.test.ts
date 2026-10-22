@@ -214,6 +214,11 @@ test("PostgreSQL repository uses a real isolated test workspace", async (t) => {
       assert.equal(reopened.completedAt, null);
       assert.equal(reopened.status, "active");
       assert.deepEqual(reopened.entries, before.entries);
+      assert.deepEqual(reopened.targetExtensions, before.targetExtensions);
+      assert.equal(
+        (await repository.listExperiments()).find((item) => item.id === id)?.status,
+        "active",
+      );
     },
   );
   await t.test(
