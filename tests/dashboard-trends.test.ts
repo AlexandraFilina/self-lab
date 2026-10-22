@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { buildDailyEntry, buildExperiment } from "../src/features/experiments/model/actions";
 import { builtInMetric } from "../src/features/experiments/model/metrics";
 import { DEFAULT_NUMERIC_SCALE } from "../src/features/experiments/model/types";
@@ -10,6 +12,7 @@ import {
   trendSeries,
   trendWindow,
 } from "../src/features/dashboard/model/dashboard-trends";
+import { DashboardTrendVisual } from "../src/features/dashboard/components/dashboard-trends";
 
 const today = "2026-10-22";
 const custom = {
@@ -76,7 +79,7 @@ test("missing scores remain gaps and one observation has no line", () => {
     ["2026-10-18", "2026-10-20"],
   );
   assert.equal(series.segments.length, 1);
-  assert.equal(series.segments[0].kind, "dashed");
+  assert.equal(series.segments[0].kind, "faded");
   assert.deepEqual(trendSeries([reflections[0]], mood, window).segments, []);
   assert.deepEqual(trendSeries([reflections[1]], mood, window).points, []);
 });
@@ -166,4 +169,83 @@ test("activity markers use one selected user experiment and preserve Done and No
   assert.equal(trendActivity([first, second], "second", window).length, 1);
   assert.deepEqual(trendActivity([first, second], null, window), []);
   assert.deepEqual(trendActivity([{ ...first, source: "sample" }], "first", window), []);
+});
+
+test("a metric without scores renders only its named empty state, even with habit activity", () => {
+  const window = trendWindow([], today, 7, 0);
+  const html = renderToStaticMarkup(
+    createElement(DashboardTrendVisual, {
+      metric: builtInMetric("focus"),
+      series: trendSeries(
+        [reflection("2026-10-20", { energy: 8 })],
+        builtInMetric("focus"),
+        window,
+      ),
+      window,
+      experimentTitle: "Morning walk",
+      activity: [
+        {
+          date: "2026-10-20",
+          experimentId: "walk",
+          title: "Morning walk",
+          status: "done" as const,
+          day: 4,
+        },
+      ],
+    }),
+  );
+  assert.match(html, /No Focus observations yet\./);
+  assert.doesNotMatch(html, /<svg|dashboard-trend-activity-point|dashboard-trends-habit-strip/);
+});
+
+test("one recorded score is one focusable point; None hides the habit strip", () => {
+  const window = trendWindow([], today, 7, 0);
+  const metric = builtInMetric("mood");
+  const html = renderToStaticMarkup(
+    createElement(DashboardTrendVisual, {
+      metric,
+      series: trendSeries([reflection("2026-10-20", { mood: 7 })], metric, window),
+      window,
+      activity: [],
+      experimentTitle: null,
+    }),
+  );
+  assert.equal((html.match(/class="dashboard-trend-point"/g) ?? []).length, 1);
+  assert.match(html, /class="dashboard-trend-point"[^>]*tabindex="0"/);
+  assert.doesNotMatch(html, /<path|dashboard-trends-habit-strip/);
+  assert.match(html, /One daily observation in this window\./);
+});
+
+test("custom score gaps fade without fake points, and habit markers live in a separate strip", () => {
+  const window = trendWindow([], today, 7, 0);
+  const series = trendSeries(
+    [reflection("2026-10-18", { [custom.id]: 4 }), reflection("2026-10-20", { [custom.id]: 8 })],
+    custom,
+    window,
+  );
+  const html = renderToStaticMarkup(
+    createElement(DashboardTrendVisual, {
+      metric: custom,
+      series,
+      window,
+      experimentTitle: "Morning walk",
+      activity: [
+        {
+          date: "2026-10-20",
+          experimentId: "walk",
+          title: "Morning walk",
+          status: "not_done" as const,
+          day: 4,
+        },
+      ],
+    }),
+  );
+  assert.equal((html.match(/class="dashboard-trend-point"/g) ?? []).length, 2);
+  assert.match(html, /data-segment="faded"[^>]*stroke-width="1.8"[^>]*stroke-opacity="0.28"/);
+  assert.doesNotMatch(html, /data-segment="dashed"|stroke-dasharray="4 5"/);
+  assert.match(html, /Faded lines cross days without a recorded score\./);
+  assert.ok(html.indexOf("dashboard-trend-activity-point") > html.indexOf("</svg>"));
+  assert.match(html, /Morning walk — Not done — October 20/);
+  assert.match(html, /data-date="2026-10-18"/);
+  assert.doesNotMatch(html, /data-date="2026-10-19"/);
 });

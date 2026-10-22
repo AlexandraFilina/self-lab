@@ -5,7 +5,7 @@ export interface ChartObservation {
   value: number;
 }
 export interface ChartSegment {
-  kind: "solid" | "dashed";
+  kind: "solid" | "faded";
   from: ChartObservation;
   to: ChartObservation;
 }
@@ -17,7 +17,7 @@ export function buildChartSegments(observations: readonly ChartObservation[]): C
     const days = dayOffset(from.date, to.date);
     if (!Number.isFinite(days) || days < 1)
       throw new Error("Chart observations must have valid, unique, ascending calendar dates.");
-    segments.push({ kind: days === 1 ? "solid" : "dashed", from, to });
+    segments.push({ kind: days === 1 ? "solid" : "faded", from, to });
   }
   return segments;
 }

@@ -254,7 +254,7 @@ test("trend eligibility is counted per metric rather than by the number of check
   assert.ok(html.includes(`Focus: ${t.experiments.singleObservation}`));
 });
 
-test("chart bridges gaps with dashed segments without manufacturing scores or tooltips", () => {
+test("chart bridges gaps with faded segments without manufacturing scores or tooltips", () => {
   const rows = [0, 1, 4].map((offset, index) =>
     buildDailyEntry(
       experiment,
@@ -271,12 +271,13 @@ test("chart bridges gaps with dashed segments without manufacturing scores or to
   assert.equal((html.match(/<circle/g) ?? []).length, 3);
   assert.equal((html.match(/<title>/g) ?? []).length, 3);
   assert.match(html, /data-segment="solid"/);
-  assert.match(html, /data-segment="dashed"[^>]*stroke-dasharray="4 5"/);
+  assert.match(html, /data-segment="faded"[^>]*stroke-width="1.8"[^>]*stroke-opacity="0.28"/);
+  assert.doesNotMatch(html, /data-segment="dashed"/);
   assert.ok(html.includes(t.experiments.chartGaps));
   assert.deepEqual(rows, copy);
   const consecutive = renderToStaticMarkup(
     createElement(MetricChart, { experiment: { ...experiment, entries: rows.slice(0, 2) } }),
   );
-  assert.doesNotMatch(consecutive, /data-segment="dashed"/);
+  assert.doesNotMatch(consecutive, /data-segment="faded"/);
   assert.ok(!consecutive.includes(t.experiments.chartGaps));
 });

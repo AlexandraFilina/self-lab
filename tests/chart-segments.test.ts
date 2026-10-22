@@ -9,10 +9,10 @@ const observations = [
   { date: "2026-10-05", value: 7 },
   { date: "2026-10-09", value: 5 },
 ];
-test("chart segments are solid only between adjacent calendar dates", () => {
+test("chart segments are solid only between adjacent calendar dates and faded across gaps", () => {
   assert.deepEqual(
     buildChartSegments(observations).map((segment) => segment.kind),
-    ["solid", "dashed", "solid", "dashed"],
+    ["solid", "faded", "solid", "faded"],
   );
 });
 test("every bridge connects two actual observations without creating points or values", () => {

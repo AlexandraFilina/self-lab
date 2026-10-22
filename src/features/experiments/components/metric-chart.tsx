@@ -39,7 +39,7 @@ export function MetricChart({ experiment }: { experiment: Experiment }) {
     segments: buildChartSegments(item.points),
   }));
   const hasGaps = segmentedSeries.some(({ segments }) =>
-    segments.some((segment) => segment.kind === "dashed"),
+    segments.some((segment) => segment.kind === "faded"),
   );
   const ticks = [
     ...new Set([1, Math.ceil(total / 4), Math.ceil(total / 2), Math.ceil((total * 3) / 4), total]),
@@ -80,14 +80,14 @@ export function MetricChart({ experiment }: { experiment: Experiment }) {
           </g>
         ))}
         {segmentedSeries.map(({ metric, points, segments }) => {
-          const paths = { solid: "", dashed: "" };
+          const paths = { solid: "", faded: "" };
           for (const segment of segments) {
             paths[segment.kind] +=
               `M${x(dayOffset(experiment.startDate, segment.from.date))},${y(segment.from.value)} L${x(dayOffset(experiment.startDate, segment.to.date))},${y(segment.to.value)} `;
           }
           return (
             <g key={metric.id} data-metric-id={metric.id}>
-              {(["solid", "dashed"] as const).map(
+              {(["solid", "faded"] as const).map(
                 (kind) =>
                   paths[kind] && (
                     <path
@@ -96,8 +96,8 @@ export function MetricChart({ experiment }: { experiment: Experiment }) {
                       d={paths[kind].trim()}
                       fill="none"
                       stroke={metricColor(metric)}
-                      strokeWidth="2.4"
-                      strokeDasharray={kind === "dashed" ? "4 5" : undefined}
+                      strokeWidth={kind === "faded" ? "1.8" : "2.8"}
+                      strokeOpacity={kind === "faded" ? 0.28 : 1}
                       strokeLinejoin="round"
                       strokeLinecap="round"
                     />
