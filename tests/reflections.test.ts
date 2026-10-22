@@ -9,6 +9,10 @@ import { outcomeEntries } from "../src/features/reflections/model/analytics";
 import { sliderPosition, sliderTicks } from "../src/features/experiments/model/slider-geometry";
 import { DEFAULT_NUMERIC_SCALE } from "../src/features/experiments/model/types";
 import { MetricSlider } from "../src/features/experiments/components/metric-slider";
+import { DailyReflectionSavedState } from "../src/features/reflections/components/daily-reflection-card";
+import { reflectionCompletion } from "../src/features/reflections/model/completion";
+import type { DailyReflection, GlobalMetric } from "../src/features/reflections/model/types";
+import { t } from "../src/i18n";
 
 test("global outcomes join only days with a Done or Not done check-in", () => {
   const experiment = buildExperiment(
@@ -146,4 +150,70 @@ test("custom labels use neutral helper copy regardless of language", () => {
   assert.match(html, /Уверенность в языке/);
   assert.match(html, /Rate this for today\./);
   assert.doesNotMatch(html, /How would you rate Уверенность/);
+});
+
+test("newly active daily measures make a saved reflection incomplete without filling a value", () => {
+  const mood = builtInMetric("mood"),
+    energy = builtInMetric("energy"),
+    focus = builtInMetric("focus");
+  const reflection: DailyReflection = {
+    id: crypto.randomUUID(),
+    observedDate: "2026-10-22",
+    values: { mood: 8, energy: 4 },
+    note: "",
+    recordedAt: "2026-10-22T12:00:00.000Z",
+    updatedAt: null,
+  };
+  const metrics: GlobalMetric[] = [
+    { definition: mood, active: true },
+    { definition: energy, active: true },
+    { definition: focus, active: false },
+  ];
+  assert.equal(reflectionCompletion(metrics, reflection).complete, true);
+  const enabled = metrics.map((item) =>
+    item.definition.id === "focus" ? { ...item, active: true } : item,
+  );
+  const partial = reflectionCompletion(enabled, reflection);
+  assert.equal(partial.complete, false);
+  assert.equal(partial.recordedCount, 2);
+  assert.equal(partial.total, 3);
+  assert.deepEqual(
+    partial.missing.map((item) => item.definition.id),
+    ["focus"],
+  );
+  assert.equal(reflection.values.focus, undefined);
+  const html = renderToStaticMarkup(
+    createElement(DailyReflectionSavedState, {
+      metrics: enabled,
+      reflection,
+      onEdit: () => undefined,
+    }),
+  );
+  assert.ok(html.includes(t.reflection.recordedToday(2, 3)));
+  assert.ok(html.includes(t.reflection.missingToday(1)));
+  assert.match(html, /Complete today&#x27;s reflection/);
+  assert.match(html, /daily-reflection-measure is-missing/);
+  assert.ok(!html.includes(t.reflection.summaryScore("Focus", 8, 10)));
+
+  const updated = { ...reflection, values: { ...reflection.values, focus: 7 } };
+  assert.equal(reflectionCompletion(enabled, updated).complete, true);
+  const completeHtml = renderToStaticMarkup(
+    createElement(DailyReflectionSavedState, {
+      metrics: enabled,
+      reflection: updated,
+      onEdit: () => undefined,
+    }),
+  );
+  assert.ok(completeHtml.includes(t.reflection.recordedToday(3, 3)));
+  assert.doesNotMatch(completeHtml, /Complete today&#x27;s reflection/);
+  assert.ok(completeHtml.includes(t.reflection.edit));
+
+  const deactivated = enabled.map((item) =>
+    item.definition.id === "focus" ? { ...item, active: false } : item,
+  );
+  const afterDeactivate = reflectionCompletion(deactivated, reflection);
+  assert.equal(afterDeactivate.total, 2);
+  assert.equal(afterDeactivate.recordedCount, 2);
+  assert.equal(afterDeactivate.complete, true);
+  assert.deepEqual(afterDeactivate.missing, []);
 });

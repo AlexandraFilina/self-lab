@@ -6,16 +6,21 @@ import { DailyEntryButton } from "@/features/experiments/components/daily-entry"
 import { ExperimentLifecycle } from "@/features/experiments/components/experiment-lifecycle";
 import { getDailyWorkflow } from "../model/daily-workflow";
 
+export function CheckInSummary({ checkedIn, total }: { checkedIn: number; total: number }) {
+  if (total === 0) return null;
+  return (
+    <p className="daily-workflow-summary" role="status" aria-atomic="true">
+      {t.dailyWorkflow.summary(checkedIn, total)}
+    </p>
+  );
+}
+
 export function TodaysCheckIns({ workflow }: { workflow: ReturnType<typeof getDailyWorkflow> }) {
   return (
     <section className="daily-workflow" aria-labelledby="daily-workflow-heading">
       <div className="section-heading">
         <h2 id="daily-workflow-heading">{t.dailyWorkflow.title}</h2>
-        {workflow.total > 0 && (
-          <p className="daily-workflow-summary" role="status" aria-atomic="true">
-            {t.dailyWorkflow.summary(workflow.checkedIn, workflow.total)}
-          </p>
-        )}
+        <CheckInSummary checkedIn={workflow.checkedIn} total={workflow.total} />
       </div>
       <ul className="daily-workflow-rows">
         {workflow.rows.map(

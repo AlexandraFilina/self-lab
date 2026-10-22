@@ -2339,14 +2339,38 @@ thead th {
   margin-bottom: 20px;
 }
 .daily-reflection-header {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
   gap: 12px;
 }
-.daily-reflection-saved .button {
-  min-height: 34px;
-  padding: 5px 12px;
+.daily-reflection-saved .daily-reflection-header > div:first-child {
+  flex: 0 0 230px;
+}
+.daily-reflection-saved .daily-reflection-edit {
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  flex: 0 0 40px;
+  padding: 8px;
+}
+.daily-reflection-saved-content {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+.daily-reflection-progress {
+  color: #6f6679;
+  font-size: 11px;
+}
+.daily-reflection-progress span {
+  margin-left: 12px;
+  color: #a05e71;
+  font-weight: 600;
+}
+.daily-reflection-complete-action {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 .daily-reflection h2,
 .daily-measures h2 {
@@ -2370,16 +2394,54 @@ thead th {
   margin-top: 12px;
 }
 .daily-reflection-summary {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 10px;
+}
+.daily-reflection-measure {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid #eee9f4;
+  background: #fff;
+  padding: 7px 11px;
+}
+.daily-reflection-measure-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #686173;
   font-size: 11px;
 }
-.daily-reflection-summary > span:not(.sr-only) {
-  border-radius: 8px;
-  background: #f8f5fc;
-  padding: 4px 8px;
+.daily-reflection-measure strong {
+  color: var(--measure-color);
+  font-size: 16px;
+  line-height: 1;
+}
+.daily-reflection-measure.is-missing {
+  border-style: dashed;
+  background: #fbfafd;
+}
+.daily-reflection-missing-label {
+  color: #a05e71;
+  font-size: 11px;
+}
+.daily-reflection-measure-scale {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 3px;
+}
+.daily-reflection-measure-scale i {
+  flex: 1;
+  min-width: 0;
+  height: 4px;
+  border-radius: 4px;
+  background: #ebe7f1;
+}
+.daily-reflection-measure-scale i.filled {
+  background: var(--measure-color);
 }
 .daily-measures ul {
   list-style: none;
@@ -2425,8 +2487,9 @@ thead th {
   font-size: 16px;
 }
 .daily-workflow-summary {
+  color: #746d80;
   font-size: 12px;
-  line-height: 1.8;
+  font-weight: 600;
 }
 .daily-workflow-rows {
   list-style: none;
@@ -2475,6 +2538,7 @@ thead th {
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  justify-self: end;
   gap: 8px;
 }
 .daily-workflow-actions .button {
@@ -2519,17 +2583,74 @@ thead th {
 .dashboard-trends-toolbar .field-label {
   margin: 0;
 }
-.dashboard-trends-select {
+.styled-select {
+  position: relative;
+  min-width: 0;
+}
+.styled-select-trigger {
   width: 100%;
   min-width: 0;
   min-height: 38px;
-  padding: 7px 10px;
+  padding: 7px 10px 7px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: #fff;
   color: var(--foreground);
-  font: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
   font-size: 12px;
+}
+.styled-select-trigger:hover,
+.styled-select-trigger[aria-expanded="true"] {
+  border-color: #b9aee8;
+  background: #fcfbff;
+}
+.styled-select-trigger svg {
+  width: 15px;
+  height: 15px;
+  color: #8778ab;
+  transform: rotate(90deg);
+}
+.styled-select-trigger[aria-expanded="true"] svg {
+  transform: rotate(-90deg);
+}
+.styled-select-options {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 5px);
+  left: 0;
+  width: 100%;
+  max-height: 230px;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 5px;
+  border: 1px solid #e4dff0;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 10px 28px #2929361c;
+}
+.styled-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 9px;
+  border-radius: 6px;
+  color: #5e596c;
+  font-size: 12px;
+  cursor: pointer;
+}
+.styled-select-option.is-active {
+  background: #f1edfb;
+  color: #604cbf;
+}
+.styled-select-option svg {
+  width: 15px;
+  height: 15px;
 }
 .dashboard-trends-ranges,
 .dashboard-trends-navigation > div {
@@ -2633,15 +2754,23 @@ thead th {
     grid-template-columns: minmax(0, 1fr);
   }
   .daily-reflection-header {
+    display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
   }
-  .daily-reflection-summary {
+  .daily-reflection-saved .daily-reflection-header > div:first-child {
+    min-width: 0;
+  }
+  .daily-reflection-saved-content {
     grid-column: 1 / -1;
     grid-row: 2;
-    justify-content: flex-start;
   }
 }
 @media (max-width: 600px) {
+  .daily-reflection-complete-action {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-self: start;
+  }
   .dashboard-trends {
     padding: 18px;
   }
@@ -2724,6 +2853,23 @@ thead th {
 .account-card {
   max-width: 580px;
 }
+.account-page {
+  width: 100%;
+}
+.account-page-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 24px;
+}
+.account-page .account-card {
+  max-width: none;
+  min-width: 0;
+  margin-bottom: 0;
+}
+.account-page .local-import-notice {
+  margin-top: 24px;
+}
 .account-card dl {
   margin: 28px 0 16px;
 }
@@ -2738,6 +2884,11 @@ thead th {
 .demo-profile .account-sign-out button {
   padding: 4px;
   font-size: 11px;
+}
+@media (max-width: 900px) {
+  .account-page-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 @media (max-width: 600px) {
   .auth-card {

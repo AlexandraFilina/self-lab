@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Card, Button } from "@/components/ui";
+import { Select } from "@/components/ui/select";
 import { t } from "@/i18n";
 import { dayOffset } from "@/lib/dates";
 import { formatDate } from "@/lib/format";
@@ -48,23 +49,14 @@ export function DashboardTrends() {
         <span className="neutral-badge">{t.dashboardTrends.scale}</span>
       </div>
       <div className="dashboard-trends-toolbar">
-        <div className="dashboard-trends-metric-control">
-          <label className="field-label" htmlFor="dashboard-trend-metric">
-            {t.dashboardTrends.metric}
-          </label>
-          <select
-            id="dashboard-trend-metric"
-            className="dashboard-trends-select"
-            value={metric?.id ?? ""}
-            onChange={(event) => setMetricId(event.target.value)}
-          >
-            {metrics.map((item) => (
-              <option key={item.id} value={item.id}>
-                {metricLabel(item)}
-              </option>
-            ))}
-          </select>
-        </div>
+        <Select
+          id="dashboard-trend-metric"
+          className="dashboard-trends-metric-control"
+          label={t.dashboardTrends.metric}
+          value={metric?.id ?? ""}
+          options={metrics.map((item) => ({ value: item.id, label: metricLabel(item) }))}
+          onChange={setMetricId}
+        />
         <div className="dashboard-trends-time-controls">
           <div
             className="dashboard-trends-ranges"
@@ -110,24 +102,17 @@ export function DashboardTrends() {
             </div>
           </div>
         </div>
-        <div className="dashboard-trends-habit-control">
-          <label className="field-label" htmlFor="dashboard-trend-habit">
-            {t.dashboardTrends.habitContext}
-          </label>
-          <select
-            id="dashboard-trend-habit"
-            className="dashboard-trends-select"
-            value={selectedExperiment?.id ?? ""}
-            onChange={(event) => setExperimentId(event.target.value || null)}
-          >
-            <option value="">{t.dashboardTrends.none}</option>
-            {userExperiments.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.title}
-              </option>
-            ))}
-          </select>
-        </div>
+        <Select
+          id="dashboard-trend-habit"
+          className="dashboard-trends-habit-control"
+          label={t.dashboardTrends.habitContext}
+          value={selectedExperiment?.id ?? ""}
+          options={[
+            { value: "", label: t.dashboardTrends.none },
+            ...userExperiments.map((item) => ({ value: item.id, label: item.title })),
+          ]}
+          onChange={(value) => setExperimentId(value || null)}
+        />
       </div>
       {metric && series ? (
         <DashboardTrendVisual
