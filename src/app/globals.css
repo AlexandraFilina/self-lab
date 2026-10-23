@@ -706,7 +706,7 @@ svg {
   white-space: nowrap;
 }
 .chart-container {
-  margin-top: 18px;
+  margin-top: 16px;
 }
 .metric-chart {
   width: 100%;
@@ -725,14 +725,18 @@ svg {
 .chart-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
+  margin-bottom: 14px;
 }
 .chart-legend > span {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 9px;
-  color: #8e8799;
+  gap: 7px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 11px;
+  color: #6f6679;
 }
 .chart-legend i,
 .metric-tags i,
@@ -742,6 +746,10 @@ svg {
   border-radius: 50%;
   display: inline-block;
   flex-shrink: 0;
+}
+.chart-legend i {
+  width: 9px;
+  height: 9px;
 }
 .chart-empty {
   display: flex;
@@ -1247,21 +1255,21 @@ svg {
   margin-top: 14px;
   padding: 18px 22px;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 20px;
 }
 .detail-progress-card .experiment-progress {
   flex: 1;
-  max-width: 520px;
+  min-width: 0;
 }
 .detail-progress-card .progress-caption strong {
   color: #6f617d;
   font-size: 14px;
 }
 .detail-progress-card .muted {
-  font-size: 11px;
-  margin-top: 5px;
+  flex-shrink: 0;
+  font-size: 12px;
 }
 .detail-chart-card,
 .comparison-card,
@@ -1270,7 +1278,10 @@ svg {
   margin-top: 18px;
 }
 .detail-chart-card .metric-chart {
-  max-height: 320px;
+  max-height: none;
+}
+.detail-chart-card > .muted {
+  margin-top: 6px;
 }
 .table-scroll {
   width: 100%;
@@ -2500,7 +2511,7 @@ thead th {
 }
 .daily-workflow-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 156px;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px 22px;
   padding: 16px 18px;
@@ -2509,8 +2520,30 @@ thead th {
   background: #fff;
 }
 .daily-workflow-checked {
-  background: #faf8ff;
-  border-color: #e9e2f5;
+  background: #f8f7fa;
+  border-color: #e8e5ed;
+}
+.daily-workflow-checked .daily-workflow-experiment h3 {
+  color: #706a77;
+  font-weight: 500;
+}
+.daily-workflow-checked .daily-workflow-progress {
+  color: #898390;
+}
+.daily-workflow-checked .progress-track {
+  background: #e7e3eb;
+}
+.daily-workflow-checked .progress-track > div {
+  background: #c3bacd;
+}
+.daily-workflow-checked .daily-workflow-actions > div > .entry-button {
+  background: transparent;
+  color: #877d92;
+  border-color: #e5e0e9;
+}
+.daily-workflow-checked .daily-workflow-actions > div > .entry-button:hover {
+  background: #f2eff6;
+  color: #6e5d80;
 }
 .daily-workflow-experiment {
   flex: 1 1 210px;
@@ -2518,33 +2551,55 @@ thead th {
 }
 .daily-workflow-experiment h3 {
   font-size: 13px;
+  font-weight: 600;
   line-height: 1.6;
   overflow-wrap: anywhere;
+}
+.daily-workflow-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.daily-workflow-recorded {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 19px;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: #e8e4ed;
+  color: #746a7e;
+}
+.daily-workflow-recorded svg {
+  width: 12px;
+  height: 12px;
 }
 .daily-workflow-experiment p {
   font-size: 11px;
   margin-top: 4px;
 }
 .daily-workflow-progress {
-  max-width: 240px;
+  width: 100%;
   margin-top: 8px;
   color: #96909f;
-  font-size: 10px;
+  font-size: 11px;
 }
 .daily-workflow-progress .progress-track {
   margin-top: 7px;
 }
 .daily-workflow-actions {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  align-items: center;
+  justify-content: flex-end;
   justify-self: end;
   gap: 8px;
 }
-.daily-workflow-actions .button {
-  width: 100%;
-  min-height: 37px;
-  padding: 7px 10px;
+.daily-workflow-actions > div > .entry-button {
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 8px;
   border-radius: 8px;
 }
 .daily-workflow-row .lifecycle-inline {
@@ -2781,11 +2836,7 @@ thead th {
     grid-template-columns: minmax(0, 1fr);
   }
   .daily-workflow-actions {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-  .daily-workflow-actions > div {
-    flex: 1 1 130px;
+    flex-wrap: nowrap;
   }
   .detail-overview-card {
     grid-template-columns: minmax(0, 1fr);

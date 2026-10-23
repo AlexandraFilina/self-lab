@@ -9,6 +9,9 @@ export function getDailyWorkflow(experiments: readonly Experiment[], today: stri
     .map((experiment) => {
       const lastDay = endDate(experiment);
       const todayEntry = experiment.entries.find((entry) => entry.observedDate === today);
+      const yesterdayEntry = experiment.entries.find((entry) => entry.observedDate === yesterday);
+      const canCheckInToday = today >= experiment.startDate && today <= lastDay;
+      const canCheckInYesterday = yesterday >= experiment.startDate && yesterday <= lastDay;
       const elapsedDays = Math.min(
         experiment.durationDays,
         Math.max(0, dayOffset(experiment.startDate, today) + 1),
@@ -16,13 +19,12 @@ export function getDailyWorkflow(experiments: readonly Experiment[], today: stri
       return {
         experiment,
         todayEntry,
+        yesterdayEntry,
+        defaultEntry: canCheckInToday ? todayEntry : yesterdayEntry,
         elapsedDays,
         elapsedPercent: Math.round((elapsedDays / experiment.durationDays) * 100),
-        canCheckInToday: today >= experiment.startDate && today <= lastDay,
-        canAddYesterday:
-          yesterday >= experiment.startDate &&
-          yesterday <= lastDay &&
-          !experiment.entries.some((entry) => entry.observedDate === yesterday),
+        canCheckInToday,
+        canCheckInYesterday,
         windowComplete: today > lastDay,
       };
     });

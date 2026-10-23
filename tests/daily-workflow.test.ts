@@ -91,16 +91,20 @@ test("saving a check-in immediately changes the derived summary and pending orde
   );
   assert.equal(getDailyWorkflow([updated, record(second, TODAY)], TODAY).caughtUp, true);
 });
-test("yesterday catch-up exists only for a missing date inside the observation target", () => {
+test("yesterday is available to add or edit only inside the observation target", () => {
   const active = experiment("first");
-  assert.equal(getDailyWorkflow([active], TODAY).rows[0].canAddYesterday, true);
-  assert.equal(getDailyWorkflow([record(active, YESTERDAY)], TODAY).rows[0].canAddYesterday, false);
+  const missing = getDailyWorkflow([active], TODAY).rows[0];
+  assert.equal(missing.canCheckInYesterday, true);
+  assert.equal(missing.yesterdayEntry, undefined);
+  const saved = getDailyWorkflow([record(active, YESTERDAY)], TODAY).rows[0];
+  assert.equal(saved.canCheckInYesterday, true);
+  assert.equal(saved.yesterdayEntry?.observedDate, YESTERDAY);
   assert.equal(
-    getDailyWorkflow([experiment("starts-today", TODAY)], TODAY).rows[0].canAddYesterday,
+    getDailyWorkflow([experiment("starts-today", TODAY)], TODAY).rows[0].canCheckInYesterday,
     false,
   );
   assert.equal(
-    getDailyWorkflow([experiment("future", addDays(TODAY, 1))], TODAY).rows[0].canAddYesterday,
+    getDailyWorkflow([experiment("future", addDays(TODAY, 1))], TODAY).rows[0].canCheckInYesterday,
     false,
   );
 });
@@ -112,7 +116,8 @@ test("older no-entry days never become a backlog or additional workflow rows", (
   assert.equal(empty.yesterday, YESTERDAY);
   const caughtYesterday = getDailyWorkflow([record(active, YESTERDAY)], TODAY);
   assert.equal(caughtYesterday.rows.length, 1);
-  assert.equal(caughtYesterday.rows[0].canAddYesterday, false);
+  assert.equal(caughtYesterday.rows[0].canCheckInYesterday, true);
+  assert.equal(caughtYesterday.rows[0].yesterdayEntry?.observedDate, YESTERDAY);
   assert.equal(caughtYesterday.rows[0].todayEntry, undefined);
   assert.equal(caughtYesterday.checkedIn, 0);
 });
@@ -152,12 +157,12 @@ test("expired active targets remain visible for lifecycle decisions without unav
   assert.equal(result.rows.length, 1);
   assert.equal(result.rows[0].windowComplete, true);
   assert.equal(result.rows[0].canCheckInToday, false);
-  assert.equal(result.rows[0].canAddYesterday, true);
+  assert.equal(result.rows[0].canCheckInYesterday, true);
   assert.equal(result.hasTargetDecisions, true);
   assert.equal(result.total, 0);
   assert.equal(result.caughtUp, false);
   const older = getDailyWorkflow([experiment("older-target", addDays(TODAY, -30), 21)], TODAY);
-  assert.equal(older.rows[0].canAddYesterday, false);
+  assert.equal(older.rows[0].canCheckInYesterday, false);
   assert.equal(older.rows.length, 1);
 });
 test("a target-decision state prevents a misleading caught-up message", () => {
@@ -195,7 +200,9 @@ test("workflow follows the user's local day across UTC boundaries and midnight",
     const saved = record(experiment("local"), today);
     assert.equal(getDailyWorkflow([saved], today).checkedIn, 1);
     assert.equal(getDailyWorkflow([saved], addDays(today, 1)).checkedIn, 0);
-    assert.equal(getDailyWorkflow([saved], addDays(today, 1)).rows[0].canAddYesterday, false);
+    const nextDay = getDailyWorkflow([saved], addDays(today, 1)).rows[0];
+    assert.equal(nextDay.canCheckInYesterday, true);
+    assert.equal(nextDay.yesterdayEntry?.observedDate, today);
     process.env.TZ = "America/Los_Angeles";
     const westernToday = localDate(new Date("2026-10-15T01:00:00Z"));
     assert.equal(westernToday, "2026-10-14");

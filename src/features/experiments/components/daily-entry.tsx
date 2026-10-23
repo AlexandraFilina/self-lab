@@ -20,6 +20,7 @@ export function DailyEntryButton({
   row = false,
   variant = "primary",
   label,
+  iconOnly = false,
   showSavedFeedback = true,
 }: {
   experiment: Experiment;
@@ -29,6 +30,7 @@ export function DailyEntryButton({
   row?: boolean;
   variant?: "primary" | "secondary" | "ghost";
   label?: string;
+  iconOnly?: boolean;
   showSavedFeedback?: boolean;
 }) {
   const { referenceDate } = useExperiments();
@@ -49,26 +51,31 @@ export function DailyEntryButton({
     (existing || targetDate >= yesterday) &&
     (experiment.status === "active" || (row && existing));
   if (experiment.source === "sample" || (!canCheckIn && !openDate)) return null;
+  const buttonLabel =
+    label ??
+    (row
+      ? t.common.edit
+      : existing
+        ? t.checkIn.edit
+        : compact || targetDate !== referenceDate
+          ? t.checkIn.check
+          : t.checkIn.today);
+  const buttonIcon = iconOnly && existing ? "edit" : existing ? "check" : "plus";
   return (
     <div className={className}>
       {canCheckIn && (
         <Button
           className="entry-button"
           variant={row ? "ghost" : variant}
+          aria-label={iconOnly ? buttonLabel : undefined}
+          title={iconOnly ? buttonLabel : undefined}
           onClick={() => {
             setSaved(false);
             setOpenDate(targetDate);
           }}
         >
-          <Icon name={existing ? "check" : "plus"} />
-          {label ??
-            (row
-              ? t.common.edit
-              : existing
-                ? t.checkIn.edit
-                : compact || targetDate !== referenceDate
-                  ? t.checkIn.check
-                  : t.checkIn.today)}
+          <Icon name={buttonIcon} />
+          {!iconOnly && buttonLabel}
         </Button>
       )}
       {saved && showSavedFeedback && (

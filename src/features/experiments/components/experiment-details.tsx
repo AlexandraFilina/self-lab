@@ -65,7 +65,13 @@ export function ExperimentDetails({ id }: { id: string }) {
           </p>
         </div>
         <div className="detail-actions">
-          {experiment.status === "active" && <DailyEntryButton experiment={experiment} />}
+          {experiment.status === "active" && (
+            <DailyEntryButton
+              experiment={experiment}
+              label={t.checkIn.dailyAction}
+              showSavedFeedback={false}
+            />
+          )}
           <ExperimentLifecycle experiment={experiment} compact />
         </div>
       </div>
@@ -81,13 +87,16 @@ export function ExperimentDetails({ id }: { id: string }) {
       </Card>
       <Card className="detail-progress-card">
         <ExperimentProgress experiment={experiment} />
-        <p className="muted">{t.experiments.observationCount(progress.recorded)}</p>
+        <p className="muted">
+          {t.experiments.recordedDays(progress.recorded, experiment.durationDays)}
+        </p>
       </Card>
       {!progress.completed && progress.windowComplete && (
         <ExperimentLifecycle experiment={experiment} />
       )}
       <Card className="detail-chart-card">
         <h2>{t.experiments.trend}</h2>
+        <p className="muted">{t.experiments.trendText}</p>
         <MetricChart experiment={analysisExperiment} />
       </Card>
       <ResultsComparison experiment={analysisExperiment} completed={progress.completed} />

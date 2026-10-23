@@ -6,6 +6,7 @@ export type IconName =
   | "plus"
   | "arrow"
   | "check"
+  | "edit"
   | "sun"
   | "moon"
   | "sparkles"
@@ -33,6 +34,7 @@ const paths: Record<IconName, React.ReactNode> = {
   plus: <path d="M12 5v14M5 12h14" />,
   arrow: <path d="M4 12h16m-6-6 6 6-6 6" />,
   check: <path d="m5 12 4 4L19 6" />,
+  edit: <path d="m4 20 4.5-1 11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20Zm10.5-13.5 3 3" />,
   sun: (
     <>
       <circle cx="12" cy="12" r="4" />

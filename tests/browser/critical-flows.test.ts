@@ -124,7 +124,7 @@ class Browser {
   }
   async click(text: string, selector = "button") {
     const point = await this.evaluate<{ x: number; y: number }>(
-      `(()=>{const element=globalThis.__qa(${JSON.stringify(selector)}).find(el=>el.textContent.replace(/\\s+/g,' ').trim()===${JSON.stringify(text)});if(!element)throw Error('Missing target: '+${JSON.stringify(text)});if(element.disabled)throw Error('Disabled target: '+${JSON.stringify(text)});element.scrollIntoView({block:'center'});for(const r of element.getClientRects()){const x=r.x+r.width/2,y=r.y+r.height/2;if(r.width>0&&r.height>0&&element.contains(document.elementFromPoint(x,y)))return {x,y}}throw Error('Obscured target: '+${JSON.stringify(text)})})()`,
+      `(()=>{const element=globalThis.__qa(${JSON.stringify(selector)}).find(el=>el.textContent.replace(/\\s+/g,' ').trim()===${JSON.stringify(text)}||el.getAttribute('aria-label')===${JSON.stringify(text)});if(!element)throw Error('Missing target: '+${JSON.stringify(text)});if(element.disabled)throw Error('Disabled target: '+${JSON.stringify(text)});element.scrollIntoView({block:'center'});for(const r of element.getClientRects()){const x=r.x+r.width/2,y=r.y+r.height/2;if(r.width>0&&r.height>0&&element.contains(document.elementFromPoint(x,y)))return {x,y}}throw Error('Obscured target: '+${JSON.stringify(text)})})()`,
     );
     await this.send("Input.dispatchMouseEvent", { type: "mouseMoved", ...point });
     await this.send("Input.dispatchMouseEvent", {
@@ -389,7 +389,7 @@ test(
       await page.score("energy", 6);
       await page.click("Save reflection");
       await page.wait(
-        "globalThis.__q('.daily-reflection-summary')?.textContent.includes('Mood · 7/10')",
+        "!!globalThis.__q('.daily-reflection-measure[aria-label=\"Mood: 7 out of 10\"]')",
       );
       assert.equal((await repository.listReflections()).length, 1);
       await navigate("/dashboard", onboardingHeading);
@@ -461,7 +461,7 @@ test(
       assert.notEqual(today, new Date().toISOString().slice(0, 10));
       await navigate(`/experiments/${firstId}`, "Reading and focus");
       assert.deepEqual(await repository.getExperiment(firstId), first);
-      await page.click("Check in today");
+      await page.click("Daily check-in");
       await page.dialogOpen();
       assert.ok(await page.evaluate("!globalThis.__q('dialog input[type=range]')"));
       await page.evaluate("globalThis.__q('input[name=habitStatus][value=done]').click()");
@@ -482,7 +482,7 @@ test(
         0,
       );
       await navigate(`/experiments/${firstId}`, "Reading and focus");
-      await page.click("Edit check-in");
+      await page.click("Daily check-in");
       await page.dialogOpen();
       assert.equal(await page.evaluate("globalThis.__q('#entry-note').value"), "Read a chapter");
       const suffix = randomUUID().replaceAll("-", "");
@@ -536,7 +536,7 @@ test(
       await navigate("/dashboard", "Hello, curious mind");
       const documentId = await page.evaluate("globalThis.__selfLabDocument");
       assert.equal(
-        await page.evaluate("globalThis.__q('.daily-workflow-summary').textContent"),
+        await page.evaluate("globalThis.__q('.daily-workflow-summary').getAttribute('aria-label')"),
         "1 of 2 checked in today",
       );
       assert.equal(await page.evaluate("globalThis.__qa('.daily-workflow-row').length"), 2);
@@ -564,10 +564,13 @@ test(
       );
       assert.ok(
         await page.evaluate(
-          `(()=>{const first=globalThis.__q('.daily-workflow-row[data-experiment-id="${firstId}"] .daily-workflow-actions button');const second=globalThis.__q('.daily-workflow-row[data-experiment-id="${secondId}"] .daily-workflow-actions button');return first&&second&&Math.abs(first.getBoundingClientRect().height-second.getBoundingClientRect().height)<1&&Math.abs(first.getBoundingClientRect().left-second.getBoundingClientRect().left)<1&&first.classList.contains('button-secondary')&&second.classList.contains('button-primary')})()`,
+          `(()=>{const first=globalThis.__q('.daily-workflow-row[data-experiment-id="${firstId}"] .daily-workflow-actions button');const second=globalThis.__q('.daily-workflow-row[data-experiment-id="${secondId}"] .daily-workflow-actions button');return first&&second&&Math.abs(first.getBoundingClientRect().width-second.getBoundingClientRect().width)<1&&Math.abs(first.getBoundingClientRect().right-second.getBoundingClientRect().right)<2&&first.getAttribute('aria-label')==='Edit check-in'&&second.getAttribute('aria-label')==='Check in'&&first.classList.contains('button-secondary')&&second.classList.contains('button-primary')})()`,
         ),
       );
-      await page.click("Edit", `.daily-workflow-row[data-experiment-id="${firstId}"] button`);
+      await page.click(
+        "Edit check-in",
+        `.daily-workflow-row[data-experiment-id="${firstId}"] button`,
+      );
       await page.dialogOpen();
       await page.click("Cancel", "dialog button");
       await page.wait("!globalThis.__q('dialog')");
@@ -576,7 +579,7 @@ test(
       await page.evaluate("globalThis.__q('input[name=habitStatus][value=not_done]').click()");
       await page.click("Save check-in");
       await page.wait(
-        "!globalThis.__q('dialog')&&globalThis.__q('.daily-workflow-summary')?.textContent==='2 of 2 checked in today'",
+        "!globalThis.__q('dialog')&&globalThis.__q('.daily-workflow-summary')?.getAttribute('aria-label')==='2 of 2 checked in today'",
       );
       assert.ok(
         await page.evaluate(
@@ -585,7 +588,7 @@ test(
       );
       assert.ok(
         await page.evaluate(
-          `globalThis.__q('.daily-workflow-row[data-experiment-id="${secondId}"] button').textContent.includes('Edit')`,
+          `globalThis.__q('.daily-workflow-row[data-experiment-id="${secondId}"] button').getAttribute('aria-label')==='Edit check-in'`,
         ),
       );
       assert.ok(await page.evaluate("!globalThis.__q('.daily-workflow .save-feedback')"));
@@ -593,7 +596,7 @@ test(
       assert.equal((await repository.getExperiment(secondId)).entries[0].habitStatus, "not_done");
       await navigate("/dashboard", "Hello, curious mind");
       assert.equal(
-        await page.evaluate("globalThis.__q('.daily-workflow-summary').textContent"),
+        await page.evaluate("globalThis.__q('.daily-workflow-summary').getAttribute('aria-label')"),
         "2 of 2 checked in today",
       );
       const reflectionBeforeEdit = (await repository.listReflections())[0];
@@ -602,13 +605,26 @@ test(
       await page.score("mood", 5);
       await page.click("Save reflection");
       await page.wait(
-        "globalThis.__q('.daily-reflection-summary')?.textContent.includes('Mood · 5/10')",
+        "!!globalThis.__q('.daily-reflection-measure[aria-label=\"Mood: 5 out of 10\"]')",
       );
       const reflectionAfterEdit = (await repository.listReflections())[0];
       assert.equal((await repository.listReflections()).length, 1);
       assert.equal(reflectionAfterEdit.id, reflectionBeforeEdit.id);
       assert.equal(reflectionAfterEdit.recordedAt, reflectionBeforeEdit.recordedAt);
       assert.ok(reflectionAfterEdit.updatedAt);
+      await page.send("Emulation.setDeviceMetricsOverride", {
+        width: 1440,
+        height: 900,
+        deviceScaleFactor: 1,
+        mobile: false,
+      });
+      await page.wait("window.innerWidth===1440");
+      assert.ok(
+        await page.evaluate(
+          "(()=>{const row=globalThis.__q('.daily-workflow-row');return row.querySelector('.progress-track').getBoundingClientRect().width>row.getBoundingClientRect().width*.7})()",
+        ),
+      );
+      await page.screenshot(join(profile, "postgres-dashboard-desktop.png"));
       await navigate(`/experiments/${firstId}`, "Reading and focus");
       await page.click("How was this calculated?", "summary");
       await page.wait("!!globalThis.__q('.comparison-table tbody tr:first-child td strong')");
@@ -687,7 +703,7 @@ test(
       assert.equal(await page.evaluate("localStorage.getItem('self-lab:experiments')"), rawBackup);
       await navigate(`/experiments/${imported.id}`, "Imported reading");
       await page.wait("!globalThis.__q('.local-import-notice button')");
-      await page.click("Check in today");
+      await page.click("Daily check-in");
       await page.dialogOpen();
       await page.click("Yesterday", "dialog button");
       assert.equal(
@@ -728,16 +744,87 @@ test(
       const extended = await repository.getExperiment(expired.id);
       assert.equal(extended.durationDays, 17);
       assert.equal(extended.targetExtensions.length, 1);
-      await page.click("Check in today");
+      await navigate("/dashboard", "Hello, curious mind");
+      const singleAction = `(()=>{const row=globalThis.__q('.daily-workflow-row[data-experiment-id="${expired.id}"]');const buttons=[...row.querySelectorAll('.daily-workflow-actions button')];return buttons.length===1&&buttons[0].getAttribute('aria-label')==='Check in'&&buttons[0].textContent.trim()===''})()`;
+      assert.ok(await page.evaluate(singleAction));
+      await page.send("Emulation.setDeviceMetricsOverride", {
+        width: 390,
+        height: 844,
+        deviceScaleFactor: 1,
+        mobile: true,
+      });
+      await page.wait("window.innerWidth===390");
+      assert.ok(await page.evaluate(singleAction));
+      assert.ok(await page.evaluate("document.documentElement.scrollWidth<=window.innerWidth"));
+      await page.send("Emulation.setDeviceMetricsOverride", {
+        width: 1440,
+        height: 900,
+        deviceScaleFactor: 1,
+        mobile: false,
+      });
+      const expiredRow = `.daily-workflow-row[data-experiment-id="${expired.id}"] button`;
+      await page.click("Check in", expiredRow);
       await page.dialogOpen();
+      assert.equal(
+        await page.evaluate(
+          "globalThis.__qa('dialog .habit-options button').filter(button=>['Today','Yesterday'].includes(button.textContent.trim())&&!button.disabled).length",
+        ),
+        2,
+      );
       await page.click("Yesterday", "dialog button");
+      await page.wait(
+        "globalThis.__q('dialog button[aria-pressed=true]')?.textContent.trim()==='Yesterday'",
+      );
       await page.evaluate("globalThis.__q('input[name=habitStatus][value=not_done]').click()");
+      await page.fill("#entry-note", "Yesterday from plus");
       await page.click("Save check-in");
       await page.wait("!globalThis.__q('dialog')");
-      assert.equal(
-        (await repository.getExperiment(expired.id)).entries[0].observedDate,
-        addDays(today, -1),
+      const yesterdayDate = addDays(today, -1);
+      const yesterdaySaved = (await repository.getExperiment(expired.id)).entries.find(
+        (entry) => entry.observedDate === yesterdayDate,
       );
+      assert.ok(yesterdaySaved);
+      assert.equal(yesterdaySaved.note, "Yesterday from plus");
+      assert.ok(await page.evaluate(singleAction));
+
+      await page.click("Check in", expiredRow);
+      await page.dialogOpen();
+      await page.click("Yesterday", "dialog button");
+      await page.wait("globalThis.__q('#entry-note')?.value==='Yesterday from plus'");
+      await page.fill("#entry-note", "Yesterday edited from plus");
+      await page.click("Save check-in");
+      await page.wait("!globalThis.__q('dialog')");
+      const yesterdayFromPlus = (await repository.getExperiment(expired.id)).entries.find(
+        (entry) => entry.observedDate === yesterdayDate,
+      );
+      assert.equal(yesterdayFromPlus?.id, yesterdaySaved.id);
+      assert.equal(yesterdayFromPlus?.note, "Yesterday edited from plus");
+
+      await page.click("Check in", expiredRow);
+      await page.dialogOpen();
+      await page.evaluate("globalThis.__q('input[name=habitStatus][value=done]').click()");
+      await page.click("Save check-in");
+      await page.wait(
+        `!globalThis.__q('dialog')&&globalThis.__q('.daily-workflow-row[data-experiment-id="${expired.id}"] .daily-workflow-actions button')?.getAttribute('aria-label')==='Edit check-in'`,
+      );
+      await page.click("Edit check-in", expiredRow);
+      await page.dialogOpen();
+      await page.click("Yesterday", "dialog button");
+      await page.wait("globalThis.__q('#entry-note')?.value==='Yesterday edited from plus'");
+      await page.fill("#entry-note", "Yesterday edited from pencil");
+      await page.click("Save check-in");
+      await page.wait("!globalThis.__q('dialog')");
+      const afterPencil = await repository.getExperiment(expired.id);
+      assert.equal(afterPencil.entries.length, 2);
+      assert.equal(
+        afterPencil.entries.find((entry) => entry.observedDate === yesterdayDate)?.id,
+        yesterdaySaved.id,
+      );
+      assert.equal(
+        afterPencil.entries.find((entry) => entry.observedDate === yesterdayDate)?.note,
+        "Yesterday edited from pencil",
+      );
+      assert.ok(afterPencil.entries.some((entry) => entry.observedDate === today));
 
       await navigate(
         "/experiments/morning-walk-completed",
@@ -766,7 +853,7 @@ test(
         );
         assert.equal(await page.evaluate("/[А-Яа-яЁё]/.test(document.body.textContent)"), false);
       }
-      await page.click("Edit check-in");
+      await page.click("Daily check-in");
       await page.dialogOpen();
       assert.ok(
         await page.evaluate(

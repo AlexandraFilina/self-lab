@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { t } from "@/i18n";
+import { Icon } from "@/components/icon";
 import { DailyEntryButton } from "@/features/experiments/components/daily-entry";
 import { ExperimentLifecycle } from "@/features/experiments/components/experiment-lifecycle";
 import { getDailyWorkflow } from "../model/daily-workflow";
@@ -27,10 +28,11 @@ export function TodaysCheckIns({ workflow }: { workflow: ReturnType<typeof getDa
           ({
             experiment,
             todayEntry,
+            defaultEntry,
             elapsedDays,
             elapsedPercent,
             canCheckInToday,
-            canAddYesterday,
+            canCheckInYesterday,
             windowComplete,
           }) => (
             <li
@@ -39,9 +41,16 @@ export function TodaysCheckIns({ workflow }: { workflow: ReturnType<typeof getDa
               className={`daily-workflow-row${todayEntry ? " daily-workflow-checked" : ""}`}
             >
               <div className="daily-workflow-experiment">
-                <h3>
-                  <Link href={`/experiments/${experiment.id}`}>{experiment.title}</Link>
-                </h3>
+                <div className="daily-workflow-title">
+                  <h3>
+                    <Link href={`/experiments/${experiment.id}`}>{experiment.title}</Link>
+                  </h3>
+                  {todayEntry && (
+                    <span className="daily-workflow-recorded" title={t.dailyWorkflow.checked}>
+                      <Icon name="check" />
+                    </span>
+                  )}
+                </div>
                 {canCheckInToday && (
                   <span className="sr-only">
                     {todayEntry ? t.dailyWorkflow.checked : t.dailyWorkflow.pending}
@@ -65,21 +74,12 @@ export function TodaysCheckIns({ workflow }: { workflow: ReturnType<typeof getDa
                 </div>
               </div>
               <div className="daily-workflow-actions">
-                {canCheckInToday && (
+                {(canCheckInToday || canCheckInYesterday) && (
                   <DailyEntryButton
                     experiment={experiment}
-                    date={workflow.today}
-                    label={todayEntry ? t.common.edit : t.checkIn.check}
-                    variant={todayEntry ? "secondary" : "primary"}
-                    showSavedFeedback={false}
-                  />
-                )}
-                {canAddYesterday && (
-                  <DailyEntryButton
-                    experiment={experiment}
-                    date={workflow.yesterday}
-                    label={t.dailyWorkflow.addYesterday}
-                    variant="secondary"
+                    compact
+                    variant={defaultEntry ? "secondary" : "primary"}
+                    iconOnly
                     showSavedFeedback={false}
                   />
                 )}

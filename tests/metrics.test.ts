@@ -189,6 +189,33 @@ test("identical one-point metrics stay separate observations without a relations
   assert.doesNotMatch(html, /<path/);
   assert.equal(html.split(t.experiments.singleObservation).length - 1, 2);
 });
+test("chart distinguishes metrics that share a default color and labels both axes", () => {
+  const tracked = { ...experiment, metrics: [builtInMetric("energy"), focus] };
+  const entries = [
+    buildDailyEntry(
+      tracked,
+      { habitStatus: "done", values: { energy: 6, [focus.id]: 6 } },
+      "first",
+      TODAY,
+      TODAY,
+    ),
+    buildDailyEntry(
+      tracked,
+      { habitStatus: "not_done", values: { energy: 6, [focus.id]: 4 } },
+      "second",
+      "2026-10-15",
+      "2026-10-15",
+    ),
+  ];
+  const html = renderToStaticMarkup(
+    createElement(MetricChart, { experiment: { ...tracked, entries } }),
+  );
+  assert.match(html, /data-metric-id="energy"[^>]*>[\s\S]*?stroke="#a27ab7"/);
+  assert.match(html, new RegExp(`data-metric-id="${focus.id}"[^>]*>[\\s\\S]*?stroke="#7765df"`));
+  assert.ok(html.includes(t.experiments.chartScore(1, 10)));
+  assert.ok(html.includes(t.experiments.chartDay(1)));
+  assert.ok(!html.includes(t.experiments.chartDays));
+});
 test("version-three migration preserves scores, timestamps, IDs, and legacy archives", async () => {
   const storage = memoryStorage();
   const samples = [
