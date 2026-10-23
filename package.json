@@ -17,7 +17,7 @@
     "db:migrate": "node --conditions=react-server --import tsx scripts/db-migrate.ts",
     "db:seed": "node --conditions=react-server --import tsx scripts/db-seed.ts",
     "db:status": "node --conditions=react-server --import tsx scripts/db-status.ts",
-    "test:db": "node --conditions=react-server --import tsx --test tests/integration/*.test.ts",
+    "test:db": "node --conditions=react-server --import tsx --test --test-concurrency=1 tests/integration/*.test.ts",
     "test:auth": "node --conditions=react-server --import tsx --test tests/integration/auth.test.ts"
   },
   "dependencies": {
